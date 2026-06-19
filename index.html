@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Space Shooter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Courier New', monospace; color: #fff; }
+    canvas { border: 2px solid #0ff; display: block; }
+    #ui { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 60px; font-size: 18px; color: #0ff; text-shadow: 0 0 8px #0ff; }
+    #overlay { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px 60px; border: 2px solid #0ff; border-radius: 8px; }
+    #overlay h1 { font-size: 36px; color: #0ff; text-shadow: 0 0 12px #0ff; }
+    #overlay p { font-size: 14px; color: #aaa; }
+    #overlay input { padding: 8px 14px; font-size: 16px; background: #111; color: #0ff; border: 1px solid #0ff; border-radius: 4px; text-align: center; outline: none; }
+    #overlay button { padding: 10px 30px; font-size: 18px; background: #0ff; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    #overlay button:hover { background: #0cc; }
+    #highscoreList { font-size: 14px; color: #0ff; text-align: center; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <span>SCORE: <span id="scoreDisplay">0</span></span>
+    <span>HIGH SCORE: <span id="highDisplay">0</span></span>
+    <span>LIVES: <span id="livesDisplay">3</span></span>
+  </div>
+  <canvas id="gameCanvas" width="600" height="700"></canvas>
+
+  <div id="overlay">
+    <h1>SPACE SHOOTER</h1>
+    <div id="highscoreList"></div>
+    <input id="nameInput" type="text" maxlength="12" placeholder="Enter your name" />
+    <p>Arrow keys to move &nbsp;|&nbsp; Spacebar to shoot</p>
+    <button id="startBtn">START GAME</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
