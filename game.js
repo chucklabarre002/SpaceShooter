@@ -97,7 +97,7 @@ function playNoise({ duration = 0.2, volume = 0.25, filterFreq = 1200, filterFre
   noise.stop(ac.currentTime + duration);
 }
 
-function sfxLaser() { playTone({ freq: 880, freqEnd: 440, duration: 0.08, type: 'square', volume: 0.08 }); }
+function sfxLaser() { playTone({ freq: 2200, freqEnd: 280, duration: 0.14, type: 'sawtooth', volume: 0.07 }); }
 function sfxTorpedoLaunch() { playTone({ freq: 200, freqEnd: 700, duration: 0.35, type: 'sawtooth', volume: 0.12 }); }
 function sfxExplosionSmall() { playNoise({ duration: 0.18, volume: 0.18, filterFreq: 1800, filterFreqEnd: 200 }); }
 function sfxExplosionBig() {
@@ -717,7 +717,7 @@ function loop() {
 function fireTorpedo() {
   if (!gameRunning || transitionPhase || torpedoCooldown > 0) return;
   torpedoes.push({ x: player.x, y: player.y - 24, vy: -5, pulse: 0, damage: 13 });
-  torpedoCooldown = 90;
+  torpedoCooldown = 30;
   sfxTorpedoLaunch();
 }
 
