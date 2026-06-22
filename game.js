@@ -614,7 +614,7 @@ function initGame() {
   floatingTexts = [];
   torpedoes = [];
   score = 0;
-  lives = 3;
+  lives = difficulty === 'test' ? 9 : 3;
   shootCooldown = 0;
   torpedoCooldown = 0;
   enemySpawnTimer = 0;
@@ -723,7 +723,7 @@ function update() {
   }
 
   // Level / tier
-  level = Math.floor(score / 200) + 1;
+  level = Math.floor(score / (difficulty === 'test' ? 2000 : 200)) + 1;
   if (tier === 1 && score >= TIER_THRESHOLDS[difficulty][2]) {
     tier = 2;
     pendingTier = 2;
