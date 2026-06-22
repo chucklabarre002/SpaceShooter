@@ -614,7 +614,7 @@ function initGame() {
   floatingTexts = [];
   torpedoes = [];
   score = 0;
-  lives = difficulty === 'test' ? 9 : 3;
+  lives = difficulty === 'test' ? 9 : 4;
   shootCooldown = 0;
   torpedoCooldown = 0;
   enemySpawnTimer = 0;
