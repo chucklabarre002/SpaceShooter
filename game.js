@@ -28,6 +28,12 @@ let difficulty = 'expert';
 
 function speedMul() { return difficulty === 'beginner' ? 0.6 : 1; }
 
+const TIER_THRESHOLDS = {
+  beginner: { 2: 6000, 3: 16000 },
+  expert: { 2: 6000, 3: 16000 },
+  test: { 2: 3000, 3: 6000 }
+};
+
 const MISSION_TEXT = {
   2: {
     1: { lines: ['MISSION 1 COMPLETED', 'NICE JOB, PILOT!'], accent: '#00ff88' },
@@ -718,14 +724,14 @@ function update() {
 
   // Level / tier
   level = Math.floor(score / 200) + 1;
-  if (tier === 1 && score >= 6000) {
+  if (tier === 1 && score >= TIER_THRESHOLDS[difficulty][2]) {
     tier = 2;
     pendingTier = 2;
     transitionPhase = 1;
     transitionTimer = 110;
     return;
   }
-  if (tier === 2 && score >= 16000) {
+  if (tier === 2 && score >= TIER_THRESHOLDS[difficulty][3]) {
     tier = 3;
     pendingTier = 3;
     transitionPhase = 1;
