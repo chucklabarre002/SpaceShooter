@@ -1187,6 +1187,10 @@ function touchToPlayerPos(touch) {
 }
 canvas.addEventListener('touchstart', e => {
   if (!gameRunning) return;
+  // Ignore a second finger (palm/thumb resting on screen) while one is already
+  // controlling the ship — otherwise it can hijack movement and snap the ship
+  // to wherever that stray touch landed.
+  if (touchId !== null) { e.preventDefault(); return; }
   const t = e.changedTouches[0];
   touchId = t.identifier;
   const pos = touchToPlayerPos(t);
