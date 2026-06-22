@@ -47,6 +47,73 @@ const MISSION_TEXT = {
   }
 };
 
+// ── Synthesized sound effects (Web Audio API, no audio files needed) ──
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Plays a short tone with a simple attack/decay envelope. freqEnd lets the pitch sweep.
+function playTone({ freq, freqEnd, duration = 0.12, type = 'sine', volume = 0.2 }) {
+  const ac = getAudioCtx();
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ac.currentTime);
+  if (freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), ac.currentTime + duration);
+  gain.gain.setValueAtTime(volume, ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start();
+  osc.stop(ac.currentTime + duration);
+}
+
+// Plays a filtered white-noise burst — good for explosions/impacts.
+function playNoise({ duration = 0.2, volume = 0.25, filterFreq = 1200, filterFreqEnd }) {
+  const ac = getAudioCtx();
+  const bufferSize = Math.floor(ac.sampleRate * duration);
+  const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ac.createBufferSource();
+  noise.buffer = buffer;
+  const filter = ac.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(filterFreq, ac.currentTime);
+  if (filterFreqEnd) filter.frequency.exponentialRampToValueAtTime(Math.max(40, filterFreqEnd), ac.currentTime + duration);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(volume, ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(ac.destination);
+  noise.start();
+  noise.stop(ac.currentTime + duration);
+}
+
+function sfxLaser() { playTone({ freq: 880, freqEnd: 440, duration: 0.08, type: 'square', volume: 0.08 }); }
+function sfxTorpedoLaunch() { playTone({ freq: 200, freqEnd: 700, duration: 0.35, type: 'sawtooth', volume: 0.12 }); }
+function sfxExplosionSmall() { playNoise({ duration: 0.18, volume: 0.18, filterFreq: 1800, filterFreqEnd: 200 }); }
+function sfxExplosionBig() {
+  playNoise({ duration: 0.45, volume: 0.3, filterFreq: 2200, filterFreqEnd: 100 });
+  playTone({ freq: 140, freqEnd: 40, duration: 0.4, type: 'sawtooth', volume: 0.15 });
+}
+function sfxMothershipHit() { playTone({ freq: 220, freqEnd: 180, duration: 0.07, type: 'square', volume: 0.1 }); }
+function sfxPlayerHit() { playNoise({ duration: 0.3, volume: 0.22, filterFreq: 900, filterFreqEnd: 80 }); }
+function sfxTierUp() {
+  [523, 659, 784, 1046].forEach((freq, i) => {
+    setTimeout(() => playTone({ freq, duration: 0.18, type: 'triangle', volume: 0.15 }), i * 90);
+  });
+}
+function sfxGameOver() { playTone({ freq: 300, freqEnd: 60, duration: 0.8, type: 'sawtooth', volume: 0.18 }); }
+function sfxButton() { playTone({ freq: 600, duration: 0.05, type: 'square', volume: 0.06 }); }
+
 // Generate stable star field once
 const STARS = Array.from({ length: 160 }, (_, i) => ({
   x: Math.random() * 600,
@@ -585,6 +652,7 @@ function addFloatingText(x, y, text, color) {
 function explodeTorpedo(t) {
   const splashRadius = 100;
   spawnParticles(t.x, t.y, '#66ffff', 32);
+  sfxExplosionBig();
   for (let ei = enemies.length - 1; ei >= 0; ei--) {
     const e = enemies[ei];
     const reach = splashRadius + (e.type === 'mothership' ? 40 : 0);
@@ -650,6 +718,7 @@ function fireTorpedo() {
   if (!gameRunning || transitionPhase || torpedoCooldown > 0) return;
   torpedoes.push({ x: player.x, y: player.y - 24, vy: -5, pulse: 0, damage: 13 });
   torpedoCooldown = 90;
+  sfxTorpedoLaunch();
 }
 
 function update() {
@@ -671,6 +740,7 @@ function update() {
   if (keys[' '] && shootCooldown <= 0) {
     bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -20 });
     shootCooldown = 14;
+    sfxLaser();
   }
   if (shootCooldown > 0) shootCooldown--;
   if (torpedoCooldown > 0) torpedoCooldown--;
@@ -735,6 +805,7 @@ function update() {
     transitionPhase = 1;
     transitionTimer = 110;
     if (difficulty === 'test') { lives = 6; updateUI(); }
+    sfxTierUp();
     return;
   }
   if (tier === 2 && score >= TIER_THRESHOLDS[difficulty][3]) {
@@ -743,6 +814,7 @@ function update() {
     transitionPhase = 1;
     transitionTimer = 110;
     if (difficulty === 'test') { lives = 6; updateUI(); }
+    sfxTierUp();
     return;
   }
 
@@ -795,6 +867,7 @@ function update() {
       enemyBullets.splice(bi, 1);
       lives--;
       updateUI();
+      sfxPlayerHit();
       if (lives <= 0) endGame();
     } else if (eb.y > canvas.height + 20) {
       enemyBullets.splice(bi, 1);
@@ -841,9 +914,11 @@ function update() {
           score += earned;
           enemies.splice(ei, 1);
           updateUI();
+          if (e.type === 'mothership') sfxExplosionBig(); else sfxExplosionSmall();
         } else if (e.type === 'mothership') {
           // Show damage hit on mothership
           spawnParticles(b.x, b.y, '#ffff00', 4);
+          sfxMothershipHit();
         }
         break;
       }
@@ -860,6 +935,7 @@ function update() {
       enemies.splice(ei, 1);
       lives -= e.type === 'mothership' ? 2 : 1;
       updateUI();
+      sfxPlayerHit();
       if (lives <= 0) endGame();
     }
   }
@@ -1077,6 +1153,7 @@ function drawMissionBanner() {
 function endGame() {
   gameRunning = false;
   cancelAnimationFrame(animId);
+  sfxGameOver();
   const name = nameInput.value.trim() || 'PILOT';
   saveHighScore(name, score);
   renderHighScores();
@@ -1159,10 +1236,12 @@ document.querySelectorAll('#difficultySelect button').forEach(btn => {
   btn.addEventListener('click', () => {
     difficulty = btn.dataset.difficulty;
     document.querySelectorAll('#difficultySelect button').forEach(b => b.classList.toggle('active', b === btn));
+    sfxButton();
   });
 });
 
 startBtn.addEventListener('click', () => {
+  sfxButton();
   if (!nameInput.value.trim()) { nameInput.focus(); return; }
   overlay.style.display = 'none';
   initGame();
