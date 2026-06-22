@@ -130,8 +130,10 @@ function drawPlanet(x, y, r) {
   ctx.restore();
 
   // ── PLANET SPHERE ──
+  // Note: every layer below fills the sphere circle directly (not a clipped rect) —
+  // each gradient already fades to transparent at its own edges, so filling the full
+  // circle each time reproduces the old clip-then-fillRect look without needing ctx.clip().
   ctx.save();
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
 
   // Deep base — warm tan/ochre like Saturn
   const baseGrad = ctx.createLinearGradient(x, y - r, x, y + r);
@@ -148,7 +150,7 @@ function drawPlanet(x, y, r) {
   baseGrad.addColorStop(0.90, '#8a6028');
   baseGrad.addColorStop(1,    '#5a3a10');
   ctx.fillStyle = baseGrad;
-  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 
   // Fine horizontal band details
   const bandData = [
@@ -172,7 +174,7 @@ function drawPlanet(x, y, r) {
     bg.addColorStop(0.6, b.c);
     bg.addColorStop(1, 'transparent');
     ctx.fillStyle = bg;
-    ctx.fillRect(x - r, by - bh, r * 2, bh * 2);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   });
 
   // Storm oval (subtle, mid latitude)
@@ -194,7 +196,7 @@ function drawPlanet(x, y, r) {
   hlGrad.addColorStop(0.40, 'rgba(255,230,170,0.06)');
   hlGrad.addColorStop(1,    'transparent');
   ctx.fillStyle = hlGrad;
-  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 
   // Terminator shadow — right/bottom limb darkening
   const termGrad = ctx.createRadialGradient(x - r * 0.15, y - r * 0.15, r * 0.5, x + r * 0.3, y + r * 0.3, r * 1.2);
@@ -203,14 +205,14 @@ function drawPlanet(x, y, r) {
   termGrad.addColorStop(0.78, 'rgba(0,0,0,0.40)');
   termGrad.addColorStop(1,    'rgba(0,0,0,0.75)');
   ctx.fillStyle = termGrad;
-  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 
   // Limb darkening edge
   const limbGrad = ctx.createRadialGradient(x, y, r * 0.72, x, y, r);
   limbGrad.addColorStop(0, 'transparent');
   limbGrad.addColorStop(1, 'rgba(0,0,0,0.62)');
   ctx.fillStyle = limbGrad;
-  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 
   // Thin atmosphere rim (warm glow at edge)
   const rimGrad = ctx.createRadialGradient(x, y, r * 0.88, x, y, r);
@@ -218,20 +220,18 @@ function drawPlanet(x, y, r) {
   rimGrad.addColorStop(0.7, 'rgba(200,160,80,0.10)');
   rimGrad.addColorStop(1,   'rgba(255,200,100,0.22)');
   ctx.fillStyle = rimGrad;
-  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 
-  ctx.restore(); // end clip
+  ctx.restore();
 
   // ── FRONT RINGS (overlap planet's lower half) ──
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(1, 0.18);
 
-  // Only draw ring arcs in front (lower semicircle = positive y in scaled space)
-  ctx.beginPath();
-  ctx.rect(-r * 2.1, 0, r * 4.2, r * 2.1);
-  ctx.clip();
-
+  // Only draw the lower semicircle of each ring (positive y in scaled space) so it
+  // appears to pass in front of the planet — built as a half-disk path instead of a
+  // clip, since the "ring" look already comes entirely from the radial gradient stops.
   ringDefs.forEach(rd => {
     const rg = ctx.createRadialGradient(0, 0, rd.inner * r, 0, 0, rd.outer * r);
     rg.addColorStop(0,   `rgba(${rd.r},${rd.g},${rd.b},0)`);
@@ -240,7 +240,7 @@ function drawPlanet(x, y, r) {
     rg.addColorStop(0.8, `rgba(${rd.r},${rd.g},${rd.b},${rd.a * 1.1})`);
     rg.addColorStop(1,   `rgba(${rd.r},${rd.g},${rd.b},0)`);
     ctx.fillStyle = rg;
-    ctx.beginPath(); ctx.arc(0, 0, rd.outer * r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, rd.outer * r, 0, Math.PI); ctx.closePath(); ctx.fill();
   });
 
   ctx.restore();
