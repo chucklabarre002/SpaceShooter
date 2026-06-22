@@ -29,9 +29,9 @@ let difficulty = 'expert';
 function speedMul() { return difficulty === 'beginner' ? 0.6 : 1; }
 
 const TIER_THRESHOLDS = {
-  beginner: { 2: 6000, 3: 16000 },
-  expert: { 2: 6000, 3: 16000 },
-  test: { 2: 3000, 3: 6000 }
+  beginner: { 2: 2000, 3: 16000 },
+  expert: { 2: 2000, 3: 16000 },
+  test: { 2: 2000, 3: 6000 }
 };
 
 const MISSION_TEXT = {
@@ -695,7 +695,7 @@ function update() {
         hp: motherHp,
         maxHp: motherHp,
         tier,
-        points: 500,
+        points: 1000,
         cannonTimer: 60
       });
     } else {
@@ -709,7 +709,7 @@ function update() {
         type,
         tier,
         hp: 1,
-        points: (type + 1) * 10,
+        points: (type + 1) * 20,
         vx: 0,
         dodged: false,
         dodgeTimer: 0,
