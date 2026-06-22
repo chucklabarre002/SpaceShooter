@@ -27,6 +27,9 @@ let transitionPhase = 0; // 0 = none, 1 = "mission complete", 2 = "prepare for n
 let transitionTimer = 0;
 let pendingTier = 2;
 let difficulty = 'expert';
+let invulnerable = 0;
+let shakeTime = 0;
+let shakeMag = 0;
 
 function speedMul() { return difficulty === 'beginner' ? 0.6 : 1; }
 
@@ -695,6 +698,8 @@ function initGame() {
   mothershipSpawnCounter = 0;
   transitionPhase = 0;
   transitionTimer = 0;
+  invulnerable = 0;
+  shakeTime = 0;
   gameRunning = true;
   updateUI();
   loop();
@@ -721,6 +726,22 @@ function fireTorpedo() {
   sfxTorpedoLaunch();
 }
 
+// Single entry point for any damage the player takes — handles the life loss,
+// a brief invulnerability window so overlapping hits in the same frame or two
+// don't chain-kill the player, a screen shake, and haptic feedback where supported
+// (note: iOS Safari does not implement the Vibration API, so this silently no-ops there).
+function damagePlayer(amount) {
+  if (invulnerable > 0) return;
+  lives -= amount;
+  updateUI();
+  sfxPlayerHit();
+  invulnerable = 60;
+  shakeTime = 18;
+  shakeMag = amount > 1 ? 14 : 9;
+  if (navigator.vibrate) navigator.vibrate(amount > 1 ? [80, 40, 80] : 60);
+  if (lives <= 0) endGame();
+}
+
 function update() {
   // Mission-complete cutscene — freeze gameplay while the banner plays out
   if (transitionPhase) {
@@ -744,6 +765,8 @@ function update() {
   }
   if (shootCooldown > 0) shootCooldown--;
   if (torpedoCooldown > 0) torpedoCooldown--;
+  if (invulnerable > 0) invulnerable--;
+  if (shakeTime > 0) shakeTime--;
 
   // Move bullets
   bullets.forEach(b => b.y += b.vy);
@@ -865,10 +888,7 @@ function update() {
     if (hitPlayer) {
       spawnParticles(player.x, player.y, '#ff2244', 16);
       enemyBullets.splice(bi, 1);
-      lives--;
-      updateUI();
-      sfxPlayerHit();
-      if (lives <= 0) endGame();
+      damagePlayer(1);
     } else if (eb.y > canvas.height + 20) {
       enemyBullets.splice(bi, 1);
     }
@@ -933,10 +953,7 @@ function update() {
     if (e.y > canvas.height + 60 || hitPlayer) {
       if (hitPlayer) spawnParticles(player.x, player.y, '#0099ff', 18);
       enemies.splice(ei, 1);
-      lives -= e.type === 'mothership' ? 2 : 1;
-      updateUI();
-      sfxPlayerHit();
-      if (lives <= 0) endGame();
+      damagePlayer(e.type === 'mothership' ? 2 : 1);
     }
   }
 
@@ -950,9 +967,16 @@ function update() {
 }
 
 function draw() {
-  // Background
+  // Background — drawn before the shake transform so the starfield stays put;
+  // only the foreground (ships, particles, bullets) actually shakes on impact.
   ctx.fillStyle = '#000005';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  if (shakeTime > 0) {
+    const mag = shakeMag * (shakeTime / 18);
+    ctx.translate((Math.random() - 0.5) * 2 * mag, (Math.random() - 0.5) * 2 * mag);
+  }
 
   // Nebula blobs
   const nebulas = [
@@ -1056,8 +1080,8 @@ function draw() {
     else drawEnemyShip(e.x, e.y, e.type, e.tier);
   });
 
-  // Player
-  if (lives > 0) drawShip(player.x, player.y);
+  // Player — flickers while invulnerable after a hit, so the recovery window is visible
+  if (lives > 0 && (invulnerable <= 0 || frameCount % 6 < 3)) drawShip(player.x, player.y);
 
   // Floating score texts (upper-right area, near score)
   floatingTexts.forEach(t => {
@@ -1070,6 +1094,8 @@ function draw() {
   });
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
+
+  ctx.restore(); // end shake transform — HUD text and the mission banner stay steady
 
   // Level
   ctx.font = '13px Courier New';
