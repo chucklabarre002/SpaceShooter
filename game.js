@@ -9,15 +9,20 @@ const startBtn = document.getElementById('startBtn');
 const nameInput = document.getElementById('nameInput');
 const highscoreList = document.getElementById('highscoreList');
 
-let player, bullets, enemies, particles, floatingTexts, score, lives, gameRunning, animId;
+let player, bullets, enemies, particles, floatingTexts, torpedoes, score, lives, gameRunning, animId;
 let keys = {};
 let shootCooldown = 0;
+let torpedoCooldown = 0;
+let lastFireTap = 0;
+let lastSpaceTime = 0;
 let enemySpawnTimer = 0;
 let enemySpawnInterval = 90;
 let level = 1;
 let tier = 1;
 let frameCount = 0;
 let mothershipSpawnCounter = 0;
+let transitionPhase = 0; // 0 = none, 1 = "mission complete", 2 = "prepare for next wave"
+let transitionTimer = 0;
 
 // Generate stable star field once
 const STARS = Array.from({ length: 160 }, (_, i) => ({
@@ -503,21 +508,51 @@ function addFloatingText(x, y, text, color) {
   floatingTexts.push({ x, y, text, color, life: 50, vy: -1.2 });
 }
 
+// Photon torpedo detonation — splash damage equal to 13 machine-gun rounds to every ship caught in the blast
+function explodeTorpedo(t) {
+  const splashRadius = 100;
+  spawnParticles(t.x, t.y, '#66ffff', 32);
+  for (let ei = enemies.length - 1; ei >= 0; ei--) {
+    const e = enemies[ei];
+    const reach = splashRadius + (e.type === 'mothership' ? 40 : 0);
+    if (Math.hypot(e.x - t.x, e.y - t.y) > reach) continue;
+    e.hp -= t.damage;
+    if (e.hp <= 0) {
+      const col = e.type === 'mothership' ? '#00ff88' : e.type === 0 ? '#ff00ff' : e.type === 1 ? '#ff4400' : '#ffaa00';
+      spawnParticles(e.x, e.y, col, e.type === 'mothership' ? 28 : 12);
+      const proximity = Math.max(0, Math.min(1, 1 - (e.y - 40) / (canvas.height - 100)));
+      const multiplier = Math.round(1 + proximity * 3);
+      const earned = e.points * multiplier;
+      const label = multiplier > 1 ? `+${earned} x${multiplier}!` : `+${earned}`;
+      addFloatingText(e.x, e.y, label, col);
+      score += earned;
+      enemies.splice(ei, 1);
+      updateUI();
+    } else if (e.type === 'mothership') {
+      spawnParticles(e.x, e.y, '#ffff00', 10);
+    }
+  }
+}
+
 function initGame() {
   player = { x: canvas.width / 2, y: canvas.height - 60, speed: 9, width: 28, height: 28 };
   bullets = [];
   enemies = [];
   particles = [];
   floatingTexts = [];
+  torpedoes = [];
   score = 0;
   lives = 3;
   shootCooldown = 0;
+  torpedoCooldown = 0;
   enemySpawnTimer = 0;
   enemySpawnInterval = 90;
   level = 1;
   tier = 1;
   frameCount = 0;
   mothershipSpawnCounter = 0;
+  transitionPhase = 0;
+  transitionTimer = 0;
   gameRunning = true;
   updateUI();
   loop();
@@ -537,7 +572,23 @@ function loop() {
   draw();
 }
 
+function fireTorpedo() {
+  if (!gameRunning || transitionPhase || torpedoCooldown > 0) return;
+  torpedoes.push({ x: player.x, y: player.y - 24, vy: -5, pulse: 0, damage: 13 });
+  torpedoCooldown = 90;
+}
+
 function update() {
+  // Mission-complete cutscene — freeze gameplay while the banner plays out
+  if (transitionPhase) {
+    transitionTimer--;
+    if (transitionTimer <= 0) {
+      if (transitionPhase === 1) { transitionPhase = 2; transitionTimer = 110; }
+      else transitionPhase = 0;
+    }
+    return;
+  }
+
   // Move player
   if (keys['ArrowLeft'] && player.x - player.width / 2 > 0) player.x -= player.speed;
   if (keys['ArrowRight'] && player.x + player.width / 2 < canvas.width) player.x += player.speed;
@@ -548,6 +599,7 @@ function update() {
     shootCooldown = 5;
   }
   if (shootCooldown > 0) shootCooldown--;
+  if (torpedoCooldown > 0) torpedoCooldown--;
 
   // Move bullets
   bullets.forEach(b => b.y += b.vy);
@@ -597,7 +649,9 @@ function update() {
   level = Math.floor(score / 200) + 1;
   if (tier === 1 && score >= 6000) {
     tier = 2;
-    addFloatingText(canvas.width / 2, canvas.height / 2, 'TIER 2 — ENEMIES ADAPT!', '#ff2244');
+    transitionPhase = 1;
+    transitionTimer = 110;
+    return;
   }
 
   // Move enemies — tier 2 fighters dodge sideways away from an incoming bullet once, then fly straight
@@ -619,6 +673,24 @@ function update() {
     }
     e.y += e.speed;
   });
+
+  // Move & resolve photon torpedoes — slow, pulsing, AoE splash damage
+  for (let ti = torpedoes.length - 1; ti >= 0; ti--) {
+    const t = torpedoes[ti];
+    t.y += t.vy;
+    t.pulse += 0.22;
+    let hit = false;
+    for (const e of enemies) {
+      const hitDist = e.type === 'mothership' ? 60 : 26;
+      if (Math.hypot(e.x - t.x, e.y - t.y) < hitDist) { hit = true; break; }
+    }
+    if (hit) {
+      explodeTorpedo(t);
+      torpedoes.splice(ti, 1);
+    } else if (t.y < -30) {
+      torpedoes.splice(ti, 1);
+    }
+  }
 
   // Collision: bullets vs enemies
   for (let bi = bullets.length - 1; bi >= 0; bi--) {
@@ -745,6 +817,23 @@ function draw() {
   });
   ctx.shadowBlur = 0;
 
+  // Photon torpedoes — pulsing glowing orb
+  torpedoes.forEach(t => {
+    const pulseR = 9 + Math.sin(t.pulse) * 3.5;
+    const tg = ctx.createRadialGradient(t.x, t.y, 1, t.x, t.y, pulseR * 2);
+    tg.addColorStop(0, '#ffffff');
+    tg.addColorStop(0.3, '#aaffff');
+    tg.addColorStop(0.6, '#22aaff');
+    tg.addColorStop(1, 'transparent');
+    ctx.fillStyle = tg;
+    ctx.beginPath(); ctx.arc(t.x, t.y, pulseR * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#66ffff';
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(t.x, t.y, pulseR * 0.4, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.shadowBlur = 0;
+
   // Enemies
   enemies.forEach(e => {
     if (e.type === 'mothership') drawMothership(e.x, e.y, e.hp, e.maxHp, e.tier);
@@ -770,6 +859,74 @@ function draw() {
   ctx.font = '13px Courier New';
   ctx.fillStyle = 'rgba(0,255,255,0.35)';
   ctx.fillText(`LEVEL ${level}${tier === 2 ? '  //  TIER 2' : ''}`, 10, canvas.height - 10);
+
+  // Mission-complete cutscene banner
+  if (transitionPhase) drawMissionBanner();
+}
+
+function drawMissionBanner() {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const fadeWindow = 20;
+  const fadeIn = Math.min(1, (110 - transitionTimer) / fadeWindow);
+  const fadeOut = Math.min(1, transitionTimer / fadeWindow);
+  const alpha = Math.min(fadeIn, fadeOut);
+
+  const lines = transitionPhase === 1
+    ? ['MISSION 1 COMPLETED', 'NICE JOB, PILOT!']
+    : ['PREPARE FOR THE NEXT WAVE...', 'YOU GOT THIS!'];
+  const accent = transitionPhase === 1 ? '#00ff88' : '#ff2244';
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Dim the battlefield behind the banner
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Banner panel
+  const panelW = 460, panelH = 160;
+  const pulse = 0.85 + 0.15 * Math.sin(frameCount * 0.12);
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 25 * pulse;
+  ctx.fillStyle = 'rgba(5,15,20,0.92)';
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cx - panelW / 2, cy - panelH / 2, panelW, panelH, 12);
+  else ctx.rect(cx - panelW / 2, cy - panelH / 2, panelW, panelH);
+  ctx.fill(); ctx.stroke();
+
+  // Badge icon — glowing ring with a checkmark / chevron
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy - panelH / 2 + 8, 22, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  if (transitionPhase === 1) {
+    ctx.moveTo(cx - 10, cy - panelH / 2 + 8);
+    ctx.lineTo(cx - 2, cy - panelH / 2 + 16);
+    ctx.lineTo(cx + 12, cy - panelH / 2 - 2);
+  } else {
+    ctx.moveTo(cx - 8, cy - panelH / 2 - 4);
+    ctx.lineTo(cx + 8, cy - panelH / 2 + 8);
+    ctx.lineTo(cx - 8, cy - panelH / 2 + 20);
+  }
+  ctx.stroke();
+
+  // Text
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = accent;
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 22px Courier New';
+  ctx.fillText(lines[0], cx, cy + 14);
+  ctx.font = 'bold 17px Courier New';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(lines[1], cx, cy + 44);
+  ctx.textAlign = 'left';
+
+  ctx.restore();
 }
 
 function endGame() {
@@ -784,7 +941,14 @@ function endGame() {
 
 window.addEventListener('keydown', e => {
   keys[e.key] = true;
-  if (e.key === ' ') e.preventDefault();
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (!e.repeat) {
+      const now = performance.now();
+      if (now - lastSpaceTime < 350) fireTorpedo();
+      lastSpaceTime = now;
+    }
+  }
 });
 window.addEventListener('keyup', e => keys[e.key] = false);
 
@@ -826,11 +990,14 @@ canvas.addEventListener('touchend', e => {
 }, { passive: false });
 canvas.addEventListener('touchcancel', () => { touchId = null; });
 
-// Touch: press and hold FIRE button to shoot
+// Touch: press and hold FIRE button to shoot; rapid double-tap launches a photon torpedo
 const fireBtn = document.getElementById('fireBtn');
 fireBtn.addEventListener('touchstart', e => {
   keys[' '] = true;
   fireBtn.classList.add('active');
+  const now = performance.now();
+  if (now - lastFireTap < 350) fireTorpedo();
+  lastFireTap = now;
   e.preventDefault();
 }, { passive: false });
 fireBtn.addEventListener('touchend', e => {
