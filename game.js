@@ -1191,7 +1191,6 @@ canvas.addEventListener('touchstart', e => {
   touchId = t.identifier;
   const pos = touchToPlayerPos(t);
   player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
-  player.y = Math.max(player.height / 2, Math.min(canvas.height - player.height / 2, pos.y));
   e.preventDefault();
 }, { passive: false });
 canvas.addEventListener('touchmove', e => {
@@ -1200,7 +1199,6 @@ canvas.addEventListener('touchmove', e => {
     if (t.identifier === touchId) {
       const pos = touchToPlayerPos(t);
       player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
-      player.y = Math.max(player.height / 2, Math.min(canvas.height - player.height / 2, pos.y));
     }
   }
   e.preventDefault();
