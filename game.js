@@ -15,6 +15,7 @@ let shootCooldown = 0;
 let enemySpawnTimer = 0;
 let enemySpawnInterval = 90;
 let level = 1;
+let tier = 1;
 let frameCount = 0;
 let mothershipSpawnCounter = 0;
 
@@ -330,7 +331,7 @@ function drawShip(x, y) {
 }
 
 // Draw enemy fighter
-function drawEnemyShip(x, y, type) {
+function drawEnemyShip(x, y, type, tier) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.PI);
@@ -340,7 +341,12 @@ function drawEnemyShip(x, y, type) {
     1: { body: '#993311', wing: '#661100', glow: '#ff4400', accent: '#ff8844' },
     2: { body: '#887700', wing: '#554400', glow: '#ffaa00', accent: '#ffdd44' },
   };
-  const c = colors[type] || colors[0];
+  const tier2Colors = {
+    0: { body: '#1a4488', wing: '#0a2255', glow: '#22aaff', accent: '#aaeeff' },
+    1: { body: '#225544', wing: '#0e3322', glow: '#22ffaa', accent: '#aaffdd' },
+    2: { body: '#444466', wing: '#222244', glow: '#8888ff', accent: '#ccccff' },
+  };
+  const c = tier === 2 ? (tier2Colors[type] || tier2Colors[0]) : (colors[type] || colors[0]);
 
   // Engine trail
   const flicker = Math.random() * 5;
@@ -369,6 +375,15 @@ function drawEnemyShip(x, y, type) {
   ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(-22, 10); ctx.lineTo(-18, 14); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(6, -2); ctx.lineTo(22, 10); ctx.lineTo(18, 14); ctx.lineTo(6, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
 
+  // Forward spike fins — tier 2 ships only, gives a sleeker/meaner silhouette
+  if (tier === 2) {
+    ctx.fillStyle = c.accent;
+    ctx.shadowColor = c.glow;
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(-14, -16); ctx.lineTo(-7, -8); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(6, -6); ctx.lineTo(14, -16); ctx.lineTo(7, -8); ctx.closePath(); ctx.fill();
+  }
+
   // Cockpit
   const cg = ctx.createRadialGradient(0, -10, 1, 0, -10, 6);
   cg.addColorStop(0, c.accent);
@@ -382,21 +397,28 @@ function drawEnemyShip(x, y, type) {
 }
 
 // Draw mothership
-function drawMothership(x, y, hp) {
+function drawMothership(x, y, hp, maxHp, tier) {
   ctx.save();
   ctx.translate(x, y);
 
+  const glowColor = tier === 2 ? '#ff2244' : '#00ff88';
   const pulse = 0.8 + 0.2 * Math.sin(frameCount * 0.05);
-  ctx.shadowColor = '#00ff88';
+  ctx.shadowColor = glowColor;
   ctx.shadowBlur = 20 * pulse;
 
   // Main saucer body
   const bg = ctx.createRadialGradient(0, 0, 5, 0, 5, 55);
-  bg.addColorStop(0, '#335544');
-  bg.addColorStop(0.5, '#1a3322');
-  bg.addColorStop(1, '#0a1a10');
+  if (tier === 2) {
+    bg.addColorStop(0, '#552233');
+    bg.addColorStop(0.5, '#330e1a');
+    bg.addColorStop(1, '#150508');
+  } else {
+    bg.addColorStop(0, '#335544');
+    bg.addColorStop(0.5, '#1a3322');
+    bg.addColorStop(1, '#0a1a10');
+  }
   ctx.fillStyle = bg;
-  ctx.strokeStyle = '#00ff88';
+  ctx.strokeStyle = glowColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.ellipse(0, 0, 55, 22, 0, 0, Math.PI * 2);
@@ -404,35 +426,60 @@ function drawMothership(x, y, hp) {
 
   // Top dome
   const dg = ctx.createRadialGradient(-10, -18, 2, 0, -14, 22);
-  dg.addColorStop(0, '#88ffcc');
-  dg.addColorStop(0.4, '#00aa55');
-  dg.addColorStop(1, '#003322');
+  if (tier === 2) {
+    dg.addColorStop(0, '#ff99aa');
+    dg.addColorStop(0.4, '#cc1133');
+    dg.addColorStop(1, '#330011');
+  } else {
+    dg.addColorStop(0, '#88ffcc');
+    dg.addColorStop(0.4, '#00aa55');
+    dg.addColorStop(1, '#003322');
+  }
   ctx.fillStyle = dg;
   ctx.beginPath();
   ctx.ellipse(0, -8, 22, 18, 0, 0, Math.PI * 2);
   ctx.fill(); ctx.stroke();
+
+  // Spikes around the rim (tier 2 only — more menacing silhouette)
+  if (tier === 2) {
+    ctx.fillStyle = '#aa1133';
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2;
+      const bx = Math.cos(angle) * 50;
+      const by = Math.sin(angle) * 19;
+      const tx = Math.cos(angle) * 64;
+      const ty = Math.sin(angle) * 25;
+      ctx.beginPath();
+      ctx.moveTo(bx - 3, by);
+      ctx.lineTo(tx, ty);
+      ctx.lineTo(bx + 3, by);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
 
   // Rotating lights around rim
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2 + frameCount * 0.04;
     const lx = Math.cos(angle) * 44;
     const ly = Math.sin(angle) * 14;
-    ctx.fillStyle = i % 2 === 0 ? '#ffff00' : '#ff4400';
-    ctx.shadowColor = i % 2 === 0 ? '#ffff00' : '#ff4400';
+    const lit1 = tier === 2 ? '#ffff00' : '#ffff00';
+    const lit2 = tier === 2 ? '#ff0044' : '#ff4400';
+    ctx.fillStyle = i % 2 === 0 ? lit1 : lit2;
+    ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 8;
     ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fill();
   }
 
   // HP bar
   const barW = 100;
-  const maxHp = 20;
   const hpFrac = hp / maxHp;
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#111';
   ctx.fillRect(-barW / 2, 28, barW, 7);
   ctx.fillStyle = hpFrac > 0.5 ? '#00ff44' : hpFrac > 0.25 ? '#ffaa00' : '#ff2200';
   ctx.fillRect(-barW / 2, 28, barW * hpFrac, 7);
-  ctx.strokeStyle = '#00ff88';
+  ctx.strokeStyle = glowColor;
   ctx.lineWidth = 1;
   ctx.strokeRect(-barW / 2, 28, barW, 7);
 
@@ -468,6 +515,7 @@ function initGame() {
   enemySpawnTimer = 0;
   enemySpawnInterval = 90;
   level = 1;
+  tier = 1;
   frameCount = 0;
   mothershipSpawnCounter = 0;
   gameRunning = true;
@@ -513,14 +561,16 @@ function update() {
 
     // Spawn mothership every 8 enemies
     if (mothershipSpawnCounter % 8 === 0) {
+      const motherHp = tier === 2 ? 25 : 20;
       enemies.push({
         x: 80 + Math.random() * (canvas.width - 160),
         y: -50,
         width: 55, height: 22,
         speed: 0.6 + level * 0.1,
         type: 'mothership',
-        hp: 20,
-        maxHp: 20,
+        hp: motherHp,
+        maxHp: motherHp,
+        tier,
         points: 500
       });
     } else {
@@ -531,19 +581,44 @@ function update() {
         width: 26, height: 26,
         speed: 1.5 + level * 0.4 + Math.random(),
         type,
+        tier,
         hp: 1,
-        points: (type + 1) * 10
+        points: (type + 1) * 10,
+        vx: 0,
+        dodged: false,
+        dodgeTimer: 0
       });
     }
 
     if (enemySpawnInterval > 40) enemySpawnInterval -= 0.3;
   }
 
-  // Move enemies
-  enemies.forEach(e => e.y += e.speed);
-
-  // Level
+  // Level / tier
   level = Math.floor(score / 200) + 1;
+  if (tier === 1 && score >= 6000) {
+    tier = 2;
+    addFloatingText(canvas.width / 2, canvas.height / 2, 'TIER 2 — ENEMIES ADAPT!', '#ff2244');
+  }
+
+  // Move enemies — tier 2 fighters dodge sideways away from an incoming bullet once, then fly straight
+  enemies.forEach(e => {
+    if (e.tier === 2 && e.type !== 'mothership') {
+      if (!e.dodged) {
+        const threat = bullets.find(b => b.y < e.y && e.y - b.y < 110 && Math.abs(b.x - e.x) < 35);
+        if (threat) {
+          e.dodged = true;
+          e.dodgeTimer = 18;
+          e.vx = (threat.x < e.x ? 1 : -1) * 4.5;
+        }
+      }
+      if (e.dodgeTimer > 0) {
+        e.x += e.vx;
+        e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
+        e.dodgeTimer--;
+      }
+    }
+    e.y += e.speed;
+  });
 
   // Collision: bullets vs enemies
   for (let bi = bullets.length - 1; bi >= 0; bi--) {
@@ -672,8 +747,8 @@ function draw() {
 
   // Enemies
   enemies.forEach(e => {
-    if (e.type === 'mothership') drawMothership(e.x, e.y, e.hp);
-    else drawEnemyShip(e.x, e.y, e.type);
+    if (e.type === 'mothership') drawMothership(e.x, e.y, e.hp, e.maxHp, e.tier);
+    else drawEnemyShip(e.x, e.y, e.type, e.tier);
   });
 
   // Player
@@ -694,7 +769,7 @@ function draw() {
   // Level
   ctx.font = '13px Courier New';
   ctx.fillStyle = 'rgba(0,255,255,0.35)';
-  ctx.fillText(`LEVEL ${level}`, 10, canvas.height - 10);
+  ctx.fillText(`LEVEL ${level}${tier === 2 ? '  //  TIER 2' : ''}`, 10, canvas.height - 10);
 }
 
 function endGame() {
