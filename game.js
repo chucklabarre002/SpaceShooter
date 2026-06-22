@@ -606,7 +606,7 @@ function explodeTorpedo(t) {
 }
 
 function initGame() {
-  player = { x: canvas.width / 2, y: canvas.height - 60, speed: 9, width: 28, height: 28 };
+  player = { x: canvas.width / 2, y: canvas.height - 60, speed: 13, width: 28, height: 28 };
   bullets = [];
   enemies = [];
   enemyBullets = [];
@@ -667,7 +667,7 @@ function update() {
 
   // Machine gun fire — short cooldown
   if (keys[' '] && shootCooldown <= 0) {
-    bullets.push({ x: player.x, y: player.y - 22, width: 4, height: 14, vy: -14 });
+    bullets.push({ x: player.x, y: player.y - 22, width: 4, height: 14, vy: -20 });
     shootCooldown = 5;
   }
   if (shootCooldown > 0) shootCooldown--;
