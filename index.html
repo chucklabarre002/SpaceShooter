@@ -22,6 +22,13 @@
     #overlay button { padding: 10px 30px; font-size: 18px; background: #0ff; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     #overlay button:hover { background: #0cc; }
     #highscoreList { font-size: 14px; color: #0ff; text-align: center; line-height: 1.8; }
+    #difficultySelect { display: flex; gap: 10px; }
+    #difficultySelect button {
+      padding: 8px 18px; font-size: 13px; background: #111; color: #0ff;
+      border: 1px solid #0ff; border-radius: 4px; cursor: pointer; font-weight: bold;
+      font-family: 'Courier New', monospace;
+    }
+    #difficultySelect button.active { background: #0ff; color: #000; }
     #fireBtn { position: absolute; top: 16px; left: 16px; width: 76px; height: 76px; border-radius: 50%; background: rgba(0,255,255,0.15); border: 2px solid #0ff; color: #0ff; font-size: 13px; font-weight: bold; font-family: 'Courier New', monospace; display: none; align-items: center; justify-content: center; user-select: none; touch-action: none; text-shadow: 0 0 8px #0ff; z-index: 2; }
     #fireBtn.active { background: rgba(0,255,255,0.45); }
     #rotatePrompt {
@@ -55,6 +62,10 @@
       <div id="highscoreList"></div>
       <input id="nameInput" type="text" maxlength="12" placeholder="Enter your name" />
       <p>Arrow keys / drag to move &nbsp;|&nbsp; Spacebar / FIRE button to shoot</p>
+      <div id="difficultySelect">
+        <button id="beginnerBtn" data-difficulty="beginner">BEGINNER</button>
+        <button id="expertBtn" data-difficulty="expert" class="active">EXPERT</button>
+      </div>
       <button id="startBtn">START GAME</button>
     </div>
   </div>
@@ -64,6 +75,6 @@
     <p>Please rotate your device to portrait mode to play.</p>
   </div>
 
-  <script src="game.js?v=4"></script>
+  <script src="game.js?v=5"></script>
 </body>
 </html>

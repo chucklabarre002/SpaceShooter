@@ -9,7 +9,7 @@ const startBtn = document.getElementById('startBtn');
 const nameInput = document.getElementById('nameInput');
 const highscoreList = document.getElementById('highscoreList');
 
-let player, bullets, enemies, particles, floatingTexts, torpedoes, score, lives, gameRunning, animId;
+let player, bullets, enemies, enemyBullets, particles, floatingTexts, torpedoes, score, lives, gameRunning, animId;
 let keys = {};
 let shootCooldown = 0;
 let torpedoCooldown = 0;
@@ -23,6 +23,21 @@ let frameCount = 0;
 let mothershipSpawnCounter = 0;
 let transitionPhase = 0; // 0 = none, 1 = "mission complete", 2 = "prepare for next wave"
 let transitionTimer = 0;
+let pendingTier = 2;
+let difficulty = 'expert';
+
+function speedMul() { return difficulty === 'beginner' ? 0.6 : 1; }
+
+const MISSION_TEXT = {
+  2: {
+    1: { lines: ['MISSION 1 COMPLETED', 'NICE JOB, PILOT!'], accent: '#00ff88' },
+    2: { lines: ['PREPARE FOR THE NEXT WAVE...', 'YOU GOT THIS!'], accent: '#ff2244' }
+  },
+  3: {
+    1: { lines: ['MISSION 2 COMPLETED', 'OUTSTANDING WORK, ACE!'], accent: '#66ddff' },
+    2: { lines: ['ENEMY REINFORCEMENTS INCOMING...', 'HOLD THE LINE!'], accent: '#ff8800' }
+  }
+};
 
 // Generate stable star field once
 const STARS = Array.from({ length: 160 }, (_, i) => ({
@@ -351,7 +366,17 @@ function drawEnemyShip(x, y, type, tier) {
     1: { body: '#225544', wing: '#0e3322', glow: '#22ffaa', accent: '#aaffdd' },
     2: { body: '#444466', wing: '#222244', glow: '#8888ff', accent: '#ccccff' },
   };
-  const c = tier === 2 ? (tier2Colors[type] || tier2Colors[0]) : (colors[type] || colors[0]);
+  const tier3Colors = {
+    0: { body: '#334455', wing: '#1a2530', glow: '#66ddff', accent: '#e0ffff' },
+    1: { body: '#4a3355', wing: '#251a2c', glow: '#cc66ff', accent: '#f0e0ff' },
+    2: { body: '#553344', wing: '#2c1a22', glow: '#ff6699', accent: '#ffe0ec' },
+  };
+  const c = tier === 3 ? (tier3Colors[type] || tier3Colors[0]) : tier === 2 ? (tier2Colors[type] || tier2Colors[0]) : (colors[type] || colors[0]);
+
+  // Tier 3 stealth drones flicker in and out — a cloaking effect
+  if (tier === 3) {
+    ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(frameCount * 0.07 + x * 0.1));
+  }
 
   // Engine trail
   const flicker = Math.random() * 5;
@@ -389,6 +414,19 @@ function drawEnemyShip(x, y, type, tier) {
     ctx.beginPath(); ctx.moveTo(6, -6); ctx.lineTo(14, -16); ctx.lineTo(7, -8); ctx.closePath(); ctx.fill();
   }
 
+  // Sniper-rail antennae — tier 3 stealth drones only
+  if (tier === 3) {
+    ctx.strokeStyle = c.glow;
+    ctx.shadowColor = c.glow;
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-4, -18); ctx.lineTo(-10, -26); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, -18); ctx.lineTo(10, -26); ctx.stroke();
+    ctx.fillStyle = c.glow;
+    ctx.beginPath(); ctx.arc(-10, -26, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(10, -26, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+
   // Cockpit
   const cg = ctx.createRadialGradient(0, -10, 1, 0, -10, 6);
   cg.addColorStop(0, c.accent);
@@ -406,14 +444,18 @@ function drawMothership(x, y, hp, maxHp, tier) {
   ctx.save();
   ctx.translate(x, y);
 
-  const glowColor = tier === 2 ? '#ff2244' : '#00ff88';
+  const glowColor = tier === 3 ? '#66ddff' : tier === 2 ? '#ff2244' : '#00ff88';
   const pulse = 0.8 + 0.2 * Math.sin(frameCount * 0.05);
   ctx.shadowColor = glowColor;
   ctx.shadowBlur = 20 * pulse;
 
   // Main saucer body
   const bg = ctx.createRadialGradient(0, 0, 5, 0, 5, 55);
-  if (tier === 2) {
+  if (tier === 3) {
+    bg.addColorStop(0, '#3a4a55');
+    bg.addColorStop(0.5, '#1c2a33');
+    bg.addColorStop(1, '#06090c');
+  } else if (tier === 2) {
     bg.addColorStop(0, '#552233');
     bg.addColorStop(0.5, '#330e1a');
     bg.addColorStop(1, '#150508');
@@ -431,7 +473,11 @@ function drawMothership(x, y, hp, maxHp, tier) {
 
   // Top dome
   const dg = ctx.createRadialGradient(-10, -18, 2, 0, -14, 22);
-  if (tier === 2) {
+  if (tier === 3) {
+    dg.addColorStop(0, '#eaffff');
+    dg.addColorStop(0.4, '#3399cc');
+    dg.addColorStop(1, '#0a2233');
+  } else if (tier === 2) {
     dg.addColorStop(0, '#ff99aa');
     dg.addColorStop(0.4, '#cc1133');
     dg.addColorStop(1, '#330011');
@@ -445,7 +491,7 @@ function drawMothership(x, y, hp, maxHp, tier) {
   ctx.ellipse(0, -8, 22, 18, 0, 0, Math.PI * 2);
   ctx.fill(); ctx.stroke();
 
-  // Spikes around the rim (tier 2 only — more menacing silhouette)
+  // Spikes around the rim (tier 2 — more menacing silhouette)
   if (tier === 2) {
     ctx.fillStyle = '#aa1133';
     for (let i = 0; i < 10; i++) {
@@ -463,13 +509,32 @@ function drawMothership(x, y, hp, maxHp, tier) {
     }
   }
 
+  // Twin side cannons (tier 3 — Dreadnought) with a charging muzzle glow
+  if (tier === 3) {
+    const cannonPulse = 0.6 + 0.4 * Math.abs(Math.sin(frameCount * 0.08));
+    [-30, 30].forEach(cx => {
+      ctx.fillStyle = '#7799aa';
+      ctx.fillRect(cx - 5, 8, 10, 16);
+      ctx.fillStyle = `rgba(150,230,255,${cannonPulse})`;
+      ctx.shadowColor = '#66ddff';
+      ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(cx, 24, 4, 0, Math.PI * 2); ctx.fill();
+    });
+    // Electric arcs across the hull
+    ctx.strokeStyle = `rgba(150,230,255,${cannonPulse})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-20, 2); ctx.lineTo(-6, -6); ctx.lineTo(6, 4); ctx.lineTo(20, -4);
+    ctx.stroke();
+  }
+
   // Rotating lights around rim
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2 + frameCount * 0.04;
     const lx = Math.cos(angle) * 44;
     const ly = Math.sin(angle) * 14;
-    const lit1 = tier === 2 ? '#ffff00' : '#ffff00';
-    const lit2 = tier === 2 ? '#ff0044' : '#ff4400';
+    const lit1 = tier === 3 ? '#aaffff' : '#ffff00';
+    const lit2 = tier === 3 ? '#3399ff' : tier === 2 ? '#ff0044' : '#ff4400';
     ctx.fillStyle = i % 2 === 0 ? lit1 : lit2;
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 8;
@@ -538,6 +603,7 @@ function initGame() {
   player = { x: canvas.width / 2, y: canvas.height - 60, speed: 9, width: 28, height: 28 };
   bullets = [];
   enemies = [];
+  enemyBullets = [];
   particles = [];
   floatingTexts = [];
   torpedoes = [];
@@ -613,32 +679,37 @@ function update() {
 
     // Spawn mothership every 8 enemies
     if (mothershipSpawnCounter % 8 === 0) {
-      const motherHp = tier === 2 ? 25 : 20;
+      const motherHp = tier === 3 ? 35 : tier === 2 ? 25 : 20;
       enemies.push({
         x: 80 + Math.random() * (canvas.width - 160),
         y: -50,
         width: 55, height: 22,
-        speed: 0.6 + level * 0.1,
+        speed: (0.6 + level * 0.1) * speedMul(),
         type: 'mothership',
         hp: motherHp,
         maxHp: motherHp,
         tier,
-        points: 500
+        points: 500,
+        cannonTimer: 60
       });
     } else {
       const type = level >= 3 ? Math.floor(Math.random() * 3) : (level === 2 ? Math.floor(Math.random() * 2) : 0);
+      const spawnX = 30 + Math.random() * (canvas.width - 60);
       enemies.push({
-        x: 30 + Math.random() * (canvas.width - 60),
+        x: spawnX,
         y: -20,
         width: 26, height: 26,
-        speed: 1.5 + level * 0.4 + Math.random(),
+        speed: (1.5 + level * 0.4 + Math.random()) * speedMul(),
         type,
         tier,
         hp: 1,
         points: (type + 1) * 10,
         vx: 0,
         dodged: false,
-        dodgeTimer: 0
+        dodgeTimer: 0,
+        baseX: spawnX,
+        weaveSeed: Math.random() * Math.PI * 2,
+        fireTimer: 60 + Math.random() * 60
       });
     }
 
@@ -649,20 +720,38 @@ function update() {
   level = Math.floor(score / 200) + 1;
   if (tier === 1 && score >= 6000) {
     tier = 2;
+    pendingTier = 2;
+    transitionPhase = 1;
+    transitionTimer = 110;
+    return;
+  }
+  if (tier === 2 && score >= 16000) {
+    tier = 3;
+    pendingTier = 3;
     transitionPhase = 1;
     transitionTimer = 110;
     return;
   }
 
-  // Move enemies — tier 2 fighters dodge sideways away from an incoming bullet once, then fly straight
+  // Move enemies
+  // Tier 2 fighters dodge sideways away from an incoming bullet once, then fly straight.
+  // Tier 3 fighters continuously weave side-to-side and periodically snipe an aimed shot at the player.
   enemies.forEach(e => {
-    if (e.tier === 2 && e.type !== 'mothership') {
+    if (e.tier === 3 && e.type !== 'mothership') {
+      e.x = e.baseX + Math.sin(frameCount * 0.05 + e.weaveSeed) * 30;
+      e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
+      e.fireTimer--;
+      if (e.fireTimer <= 0 && e.y > 0) {
+        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (4 + level * 0.2) * speedMul() });
+        e.fireTimer = 90 + Math.random() * 60;
+      }
+    } else if (e.tier === 2 && e.type !== 'mothership') {
       if (!e.dodged) {
         const threat = bullets.find(b => b.y < e.y && e.y - b.y < 110 && Math.abs(b.x - e.x) < 35);
         if (threat) {
           e.dodged = true;
           e.dodgeTimer = 18;
-          e.vx = (threat.x < e.x ? 1 : -1) * 4.5;
+          e.vx = (threat.x < e.x ? 1 : -1) * 4.5 * speedMul();
         }
       }
       if (e.dodgeTimer > 0) {
@@ -671,8 +760,33 @@ function update() {
         e.dodgeTimer--;
       }
     }
+    if (e.type === 'mothership' && e.tier === 3) {
+      e.cannonTimer--;
+      if (e.cannonTimer <= 0 && e.y > 0) {
+        const spread = 30;
+        enemyBullets.push({ x: e.x - spread, y: e.y + 10, vy: (3.5 + level * 0.15) * speedMul() });
+        enemyBullets.push({ x: e.x + spread, y: e.y + 10, vy: (3.5 + level * 0.15) * speedMul() });
+        e.cannonTimer = 100;
+      }
+    }
     e.y += e.speed;
   });
+
+  // Move enemy bullets and resolve collision with the player
+  for (let bi = enemyBullets.length - 1; bi >= 0; bi--) {
+    const eb = enemyBullets[bi];
+    eb.y += eb.vy;
+    const hitPlayer = lives > 0 && Math.abs(eb.x - player.x) < 16 && Math.abs(eb.y - player.y) < 20;
+    if (hitPlayer) {
+      spawnParticles(player.x, player.y, '#ff2244', 16);
+      enemyBullets.splice(bi, 1);
+      lives--;
+      updateUI();
+      if (lives <= 0) endGame();
+    } else if (eb.y > canvas.height + 20) {
+      enemyBullets.splice(bi, 1);
+    }
+  }
 
   // Move & resolve photon torpedoes — slow, pulsing, AoE splash damage
   for (let ti = torpedoes.length - 1; ti >= 0; ti--) {
@@ -817,6 +931,19 @@ function draw() {
   });
   ctx.shadowBlur = 0;
 
+  // Enemy bullets — tier 3 sniper/cannon fire
+  enemyBullets.forEach(eb => {
+    const eg = ctx.createLinearGradient(eb.x, eb.y - 8, eb.x, eb.y + 8);
+    eg.addColorStop(0, '#ffffff');
+    eg.addColorStop(0.4, '#66ddff');
+    eg.addColorStop(1, '#ff2266');
+    ctx.fillStyle = eg;
+    ctx.shadowColor = '#66ddff';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(eb.x - 2.5, eb.y - 8, 5, 16);
+  });
+  ctx.shadowBlur = 0;
+
   // Photon torpedoes — pulsing glowing orb
   torpedoes.forEach(t => {
     const pulseR = 9 + Math.sin(t.pulse) * 3.5;
@@ -858,7 +985,7 @@ function draw() {
   // Level
   ctx.font = '13px Courier New';
   ctx.fillStyle = 'rgba(0,255,255,0.35)';
-  ctx.fillText(`LEVEL ${level}${tier === 2 ? '  //  TIER 2' : ''}`, 10, canvas.height - 10);
+  ctx.fillText(`LEVEL ${level}${tier > 1 ? `  //  TIER ${tier}` : ''}`, 10, canvas.height - 10);
 
   // Mission-complete cutscene banner
   if (transitionPhase) drawMissionBanner();
@@ -871,10 +998,9 @@ function drawMissionBanner() {
   const fadeOut = Math.min(1, transitionTimer / fadeWindow);
   const alpha = Math.min(fadeIn, fadeOut);
 
-  const lines = transitionPhase === 1
-    ? ['MISSION 1 COMPLETED', 'NICE JOB, PILOT!']
-    : ['PREPARE FOR THE NEXT WAVE...', 'YOU GOT THIS!'];
-  const accent = transitionPhase === 1 ? '#00ff88' : '#ff2244';
+  const banner = MISSION_TEXT[pendingTier][transitionPhase];
+  const lines = banner.lines;
+  const accent = banner.accent;
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -1008,6 +1134,13 @@ fireBtn.addEventListener('touchend', e => {
 fireBtn.addEventListener('touchcancel', () => {
   keys[' '] = false;
   fireBtn.classList.remove('active');
+});
+
+document.querySelectorAll('#difficultySelect button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    difficulty = btn.dataset.difficulty;
+    document.querySelectorAll('#difficultySelect button').forEach(b => b.classList.toggle('active', b === btn));
+  });
 });
 
 startBtn.addEventListener('click', () => {
