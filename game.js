@@ -647,43 +647,68 @@ function drawMothership(x, y, hp, maxHp, tier) {
 function drawCloaker(x, y, alpha) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate(Math.PI);
   ctx.globalAlpha = alpha;
 
   const pulse = 0.7 + 0.3 * Math.sin(frameCount * 0.15);
 
   // Outer halo — large and bright so it reads as a special target at a glance
-  const haloGrad = ctx.createRadialGradient(0, 0, 3, 0, 0, 42 * pulse);
-  haloGrad.addColorStop(0, 'rgba(255,245,180,0.7)');
-  haloGrad.addColorStop(0.45, 'rgba(255,221,0,0.35)');
+  const haloGrad = ctx.createRadialGradient(0, 0, 3, 0, 0, 40 * pulse);
+  haloGrad.addColorStop(0, 'rgba(255,245,180,0.6)');
+  haloGrad.addColorStop(0.45, 'rgba(255,221,0,0.3)');
   haloGrad.addColorStop(1, 'transparent');
   ctx.fillStyle = haloGrad;
-  ctx.beginPath(); ctx.arc(0, 0, 42 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, 40 * pulse, 0, Math.PI * 2); ctx.fill();
 
-  // Diamond hull
   ctx.shadowColor = '#ffdd00';
-  ctx.shadowBlur = 26 * pulse;
-  const hullGrad = ctx.createLinearGradient(0, -24, 0, 24);
-  hullGrad.addColorStop(0, '#fff7cc');
-  hullGrad.addColorStop(0.5, '#ffcc00');
-  hullGrad.addColorStop(1, '#aa7700');
-  ctx.fillStyle = hullGrad;
-  ctx.strokeStyle = '#ffffaa';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, -24);
-  ctx.lineTo(16, 0);
-  ctx.lineTo(0, 24);
-  ctx.lineTo(-16, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  ctx.shadowBlur = 22 * pulse;
 
-  // Inner core flicker
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowBlur = 14;
-  ctx.beginPath(); ctx.arc(0, 0, 6 * pulse, 0, Math.PI * 2); ctx.fill();
+  // Shimmering "ghost" copy, slightly offset and faint — sells the cloaking-tech feel
+  ctx.save();
+  ctx.globalAlpha *= 0.3;
+  ctx.translate(Math.sin(frameCount * 0.18) * 3, 0);
+  drawCloakerHull();
+  ctx.restore();
+
+  // Main hull — a sleek swept-wing stealth fighter, not just a diamond
+  drawCloakerHull();
+
+  // Cockpit
+  ctx.fillStyle = '#fffde0';
+  ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.ellipse(0, -8, 3, 6, 0, 0, Math.PI * 2); ctx.fill();
 
   ctx.restore();
+
+  function drawCloakerHull() {
+    const hullGrad = ctx.createLinearGradient(0, -18, 0, 12);
+    hullGrad.addColorStop(0, '#fff7cc');
+    hullGrad.addColorStop(0.5, '#ffcc00');
+    hullGrad.addColorStop(1, '#aa7700');
+    ctx.fillStyle = hullGrad;
+    ctx.strokeStyle = '#ffffaa';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -18);
+    ctx.lineTo(7, -4);
+    ctx.lineTo(22, 8);
+    ctx.lineTo(8, 6);
+    ctx.lineTo(0, 11);
+    ctx.lineTo(-8, 6);
+    ctx.lineTo(-22, 8);
+    ctx.lineTo(-7, -4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Engine glow trail
+    const flicker = Math.random() * 4;
+    const eg = ctx.createLinearGradient(0, 6, 0, 16 + flicker);
+    eg.addColorStop(0, '#ffee88');
+    eg.addColorStop(1, 'transparent');
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.moveTo(-4, 8); ctx.lineTo(0, 16 + flicker); ctx.lineTo(4, 8); ctx.closePath(); ctx.fill();
+  }
 }
 
 function spawnParticles(x, y, color, count = 12) {
@@ -915,7 +940,8 @@ function update() {
       hp: 1,
       phase: 'visible',
       phaseTimer: 130 + Math.random() * 50,
-      alpha: 1
+      alpha: 1,
+      driftPhase: Math.random() * Math.PI * 2
     });
     spawnParticles(cx, cy, '#ffdd00', 14);
     sfxCloakerAppear();
@@ -948,6 +974,13 @@ function update() {
   // Tier 3 fighters continuously weave side-to-side and periodically snipe an aimed shot at the player.
   enemies.forEach(e => {
     if (e.type === 'cloaker') {
+      // Slow continuous drift forward (down the screen) and a gentle side-to-side
+      // sway, on top of the teleport hops — it travels across the screen rather
+      // than looping in place forever, and eventually drifts off the bottom.
+      e.y += 0.45 * speedMul();
+      e.x += Math.sin(frameCount * 0.02 + e.driftPhase) * 0.5;
+      e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
+
       e.phaseTimer--;
       if (e.phase === 'visible') {
         e.alpha = 1;
@@ -958,8 +991,9 @@ function update() {
       } else if (e.phase === 'hidden') {
         e.alpha = 0;
         if (e.phaseTimer <= 0) {
-          e.x = 60 + Math.random() * (canvas.width - 120);
-          e.y = 100 + Math.random() * (canvas.height - 300);
+          // Teleport forward along its journey rather than jumping anywhere on screen
+          e.x = 40 + Math.random() * (canvas.width - 80);
+          e.y = Math.min(canvas.height - 80, e.y + 80 + Math.random() * 120);
           e.phase = 'appearing';
           e.phaseTimer = 20;
         }
@@ -1008,6 +1042,10 @@ function update() {
     }
     e.y += e.speed;
   });
+
+  // The cloaker drifts off naturally once it reaches the bottom of its journey —
+  // no penalty, it just leaves (it was never a threat, only a bonus target).
+  enemies = enemies.filter(e => !(e.type === 'cloaker' && e.y > canvas.height + 60));
 
   // Move enemy bullets and resolve collision with the player
   for (let bi = enemyBullets.length - 1; bi >= 0; bi--) {
