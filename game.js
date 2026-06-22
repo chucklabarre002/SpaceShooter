@@ -713,6 +713,61 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.key] = false);
 
+// Touch: drag finger on canvas to move the ship directly
+let touchId = null;
+function touchToPlayerPos(touch) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (touch.clientX - rect.left) * scaleX,
+    y: (touch.clientY - rect.top) * scaleY
+  };
+}
+canvas.addEventListener('touchstart', e => {
+  if (!gameRunning) return;
+  const t = e.changedTouches[0];
+  touchId = t.identifier;
+  const pos = touchToPlayerPos(t);
+  player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
+  player.y = Math.max(player.height / 2, Math.min(canvas.height - player.height / 2, pos.y));
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  if (!gameRunning) return;
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchId) {
+      const pos = touchToPlayerPos(t);
+      player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
+      player.y = Math.max(player.height / 2, Math.min(canvas.height - player.height / 2, pos.y));
+    }
+  }
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchId) touchId = null;
+  }
+}, { passive: false });
+canvas.addEventListener('touchcancel', () => { touchId = null; });
+
+// Touch: press and hold FIRE button to shoot
+const fireBtn = document.getElementById('fireBtn');
+fireBtn.addEventListener('touchstart', e => {
+  keys[' '] = true;
+  fireBtn.classList.add('active');
+  e.preventDefault();
+}, { passive: false });
+fireBtn.addEventListener('touchend', e => {
+  keys[' '] = false;
+  fireBtn.classList.remove('active');
+  e.preventDefault();
+}, { passive: false });
+fireBtn.addEventListener('touchcancel', () => {
+  keys[' '] = false;
+  fireBtn.classList.remove('active');
+});
+
 startBtn.addEventListener('click', () => {
   if (!nameInput.value.trim()) { nameInput.focus(); return; }
   overlay.style.display = 'none';

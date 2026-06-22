@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Space Shooter</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Courier New', monospace; color: #fff; }
-    canvas { border: 2px solid #0ff; display: block; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Courier New', monospace; color: #fff; overscroll-behavior: none; }
+    #gameWrap { position: relative; width: 600px; max-width: 100vw; max-height: 100vh; touch-action: none; }
+    canvas { border: 2px solid #0ff; display: block; width: 100%; height: auto; touch-action: none; }
     #ui { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 60px; font-size: 18px; color: #0ff; text-shadow: 0 0 8px #0ff; }
     #overlay { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px 60px; border: 2px solid #0ff; border-radius: 8px; }
     #overlay h1 { font-size: 36px; color: #0ff; text-shadow: 0 0 12px #0ff; }
@@ -15,6 +17,11 @@
     #overlay button { padding: 10px 30px; font-size: 18px; background: #0ff; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     #overlay button:hover { background: #0cc; }
     #highscoreList { font-size: 14px; color: #0ff; text-align: center; line-height: 1.8; }
+    #fireBtn { position: absolute; top: 16px; left: 16px; width: 76px; height: 76px; border-radius: 50%; background: rgba(0,255,255,0.15); border: 2px solid #0ff; color: #0ff; font-size: 13px; font-weight: bold; font-family: 'Courier New', monospace; display: none; align-items: center; justify-content: center; user-select: none; touch-action: none; text-shadow: 0 0 8px #0ff; }
+    #fireBtn.active { background: rgba(0,255,255,0.45); }
+    @media (pointer: coarse) {
+      #fireBtn { display: flex; }
+    }
   </style>
 </head>
 <body>
@@ -23,14 +30,17 @@
     <span>HIGH SCORE: <span id="highDisplay">0</span></span>
     <span>LIVES: <span id="livesDisplay">3</span></span>
   </div>
-  <canvas id="gameCanvas" width="600" height="700"></canvas>
+  <div id="gameWrap">
+    <canvas id="gameCanvas" width="600" height="700"></canvas>
+    <div id="fireBtn">FIRE</div>
 
-  <div id="overlay">
-    <h1>SPACE SHOOTER</h1>
-    <div id="highscoreList"></div>
-    <input id="nameInput" type="text" maxlength="12" placeholder="Enter your name" />
-    <p>Arrow keys to move &nbsp;|&nbsp; Spacebar to shoot</p>
-    <button id="startBtn">START GAME</button>
+    <div id="overlay">
+      <h1>SPACE SHOOTER</h1>
+      <div id="highscoreList"></div>
+      <input id="nameInput" type="text" maxlength="12" placeholder="Enter your name" />
+      <p>Arrow keys / drag to move &nbsp;|&nbsp; Spacebar / FIRE button to shoot</p>
+      <button id="startBtn">START GAME</button>
+    </div>
   </div>
 
   <script src="game.js"></script>
