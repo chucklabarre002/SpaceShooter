@@ -1,5 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const glowCanvas = document.getElementById('glowCanvas');
+const glowCtx = glowCanvas.getContext('2d');
 
 const scoreDisplay = document.getElementById('scoreDisplay');
 const highDisplay = document.getElementById('highDisplay');
@@ -997,6 +999,12 @@ function draw() {
 
   // Mission-complete cutscene banner
   if (transitionPhase) drawMissionBanner();
+
+  // Bloom pass — copy the frame onto a blurred, screen-blended layer (see #glowCanvas
+  // CSS). Screen-blending a near-black background barely changes it, so only the
+  // bright neon shapes visibly bloom outward.
+  glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+  glowCtx.drawImage(canvas, 0, 0);
 }
 
 function drawMissionBanner() {
