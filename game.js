@@ -642,8 +642,9 @@ function drawMothership(x, y, hp, maxHp, tier) {
   ctx.restore();
 }
 
-// Draw the rare cloaking ship — a golden glowing diamond that pulses brighter than
-// any normal fighter so it reads as a special, valuable target while visible.
+// Draw the rare cloaking ship — same silhouette as a normal fighter (fuselage,
+// wings, cockpit), just recolored gold and wrapped in a bright pulsing halo so it
+// still reads as a special, valuable target while visible.
 function drawCloaker(x, y, alpha) {
   ctx.save();
   ctx.translate(x, y);
@@ -653,15 +654,15 @@ function drawCloaker(x, y, alpha) {
   const pulse = 0.7 + 0.3 * Math.sin(frameCount * 0.15);
 
   // Outer halo — large and bright so it reads as a special target at a glance
-  const haloGrad = ctx.createRadialGradient(0, 0, 3, 0, 0, 40 * pulse);
-  haloGrad.addColorStop(0, 'rgba(255,245,180,0.6)');
-  haloGrad.addColorStop(0.45, 'rgba(255,221,0,0.3)');
+  const haloGrad = ctx.createRadialGradient(0, 0, 3, 0, 0, 38 * pulse);
+  haloGrad.addColorStop(0, 'rgba(255,245,180,0.55)');
+  haloGrad.addColorStop(0.45, 'rgba(255,221,0,0.28)');
   haloGrad.addColorStop(1, 'transparent');
   ctx.fillStyle = haloGrad;
-  ctx.beginPath(); ctx.arc(0, 0, 40 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, 38 * pulse, 0, Math.PI * 2); ctx.fill();
 
   ctx.shadowColor = '#ffdd00';
-  ctx.shadowBlur = 22 * pulse;
+  ctx.shadowBlur = 16 * pulse;
 
   // Shimmering "ghost" copy, slightly offset and faint — sells the cloaking-tech feel
   ctx.save();
@@ -670,44 +671,45 @@ function drawCloaker(x, y, alpha) {
   drawCloakerHull();
   ctx.restore();
 
-  // Main hull — a sleek swept-wing stealth fighter, not just a diamond
+  // Main hull — standard fighter silhouette, just in gold
   drawCloakerHull();
-
-  // Cockpit
-  ctx.fillStyle = '#fffde0';
-  ctx.shadowBlur = 10;
-  ctx.beginPath(); ctx.ellipse(0, -8, 3, 6, 0, 0, Math.PI * 2); ctx.fill();
 
   ctx.restore();
 
   function drawCloakerHull() {
-    const hullGrad = ctx.createLinearGradient(0, -18, 0, 12);
-    hullGrad.addColorStop(0, '#fff7cc');
-    hullGrad.addColorStop(0.5, '#ffcc00');
-    hullGrad.addColorStop(1, '#aa7700');
-    ctx.fillStyle = hullGrad;
+    // Engine trail (same shape as a normal fighter's)
+    const flicker = Math.random() * 5;
+    const eg = ctx.createLinearGradient(0, 8, 0, 24 + flicker);
+    eg.addColorStop(0, '#ffdd00');
+    eg.addColorStop(1, 'transparent');
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.moveTo(-5, 10); ctx.lineTo(0, 24 + flicker); ctx.lineTo(5, 10); ctx.closePath(); ctx.fill();
+
+    // Fuselage
+    const fg = ctx.createLinearGradient(-8, -20, 8, -20);
+    fg.addColorStop(0, '#aa7700');
+    fg.addColorStop(0.5, '#ffcc00');
+    fg.addColorStop(1, '#aa7700');
+    ctx.fillStyle = fg;
     ctx.strokeStyle = '#ffffaa';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(0, -18);
-    ctx.lineTo(7, -4);
-    ctx.lineTo(22, 8);
-    ctx.lineTo(8, 6);
-    ctx.lineTo(0, 11);
-    ctx.lineTo(-8, 6);
-    ctx.lineTo(-22, 8);
-    ctx.lineTo(-7, -4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.moveTo(0, -20); ctx.lineTo(6, -6); ctx.lineTo(6, 8); ctx.lineTo(0, 5); ctx.lineTo(-6, 8); ctx.lineTo(-6, -6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
 
-    // Engine glow trail
-    const flicker = Math.random() * 4;
-    const eg = ctx.createLinearGradient(0, 6, 0, 16 + flicker);
-    eg.addColorStop(0, '#ffee88');
-    eg.addColorStop(1, 'transparent');
-    ctx.fillStyle = eg;
-    ctx.beginPath(); ctx.moveTo(-4, 8); ctx.lineTo(0, 16 + flicker); ctx.lineTo(4, 8); ctx.closePath(); ctx.fill();
+    // Wings
+    ctx.fillStyle = '#aa7700';
+    ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(-22, 10); ctx.lineTo(-18, 14); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6, -2); ctx.lineTo(22, 10); ctx.lineTo(18, 14); ctx.lineTo(6, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    // Cockpit
+    const cg = ctx.createRadialGradient(0, -10, 1, 0, -10, 6);
+    cg.addColorStop(0, '#fff7cc');
+    cg.addColorStop(1, '#aa7700');
+    ctx.fillStyle = cg;
+    ctx.strokeStyle = '#ffffaa';
+    ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.ellipse(0, -10, 3, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
 }
 
@@ -836,13 +838,19 @@ function triggerCloakerHit(e) {
   sfxBonusLife();
   lives++;
   updateUI();
-  shakeTime = 18;
-  shakeMag = 12;
+  shakeTime = 12;
+  shakeMag = 6;
   cloakerBannerTimer = 110;
   if (navigator.vibrate) navigator.vibrate([60, 40, 60, 40, 120]);
 }
 
 function update() {
+  // Shake/invulnerability must always tick down, even during a freeze-frame banner --
+  // otherwise a freeze that starts right after a hit holds the shake at full intensity
+  // for the entire freeze instead of its short intended duration.
+  if (invulnerable > 0) invulnerable--;
+  if (shakeTime > 0) shakeTime--;
+
   // Mission-complete cutscene — freeze gameplay while the banner plays out
   if (transitionPhase) {
     transitionTimer--;
@@ -871,8 +879,6 @@ function update() {
   }
   if (shootCooldown > 0) shootCooldown--;
   if (torpedoCooldown > 0) torpedoCooldown--;
-  if (invulnerable > 0) invulnerable--;
-  if (shakeTime > 0) shakeTime--;
 
   // Move bullets
   bullets.forEach(b => b.y += b.vy);
