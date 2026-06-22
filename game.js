@@ -123,6 +123,7 @@ function sfxBonusLife() {
     setTimeout(() => playTone({ freq, duration: 0.22, type: 'sine', volume: 0.18 }), i * 80);
   });
 }
+function sfxCloakerAppear() { playTone({ freq: 1200, freqEnd: 2000, duration: 0.2, type: 'sine', volume: 0.12 }); }
 
 // Generate stable star field once
 const STARS = Array.from({ length: 160 }, (_, i) => ({
@@ -650,37 +651,37 @@ function drawCloaker(x, y, alpha) {
 
   const pulse = 0.7 + 0.3 * Math.sin(frameCount * 0.15);
 
-  // Outer halo
-  const haloGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 26 * pulse);
-  haloGrad.addColorStop(0, 'rgba(255,238,150,0.55)');
-  haloGrad.addColorStop(0.5, 'rgba(255,221,0,0.22)');
+  // Outer halo — large and bright so it reads as a special target at a glance
+  const haloGrad = ctx.createRadialGradient(0, 0, 3, 0, 0, 42 * pulse);
+  haloGrad.addColorStop(0, 'rgba(255,245,180,0.7)');
+  haloGrad.addColorStop(0.45, 'rgba(255,221,0,0.35)');
   haloGrad.addColorStop(1, 'transparent');
   ctx.fillStyle = haloGrad;
-  ctx.beginPath(); ctx.arc(0, 0, 26 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, 42 * pulse, 0, Math.PI * 2); ctx.fill();
 
   // Diamond hull
   ctx.shadowColor = '#ffdd00';
-  ctx.shadowBlur = 18 * pulse;
-  const hullGrad = ctx.createLinearGradient(0, -16, 0, 16);
+  ctx.shadowBlur = 26 * pulse;
+  const hullGrad = ctx.createLinearGradient(0, -24, 0, 24);
   hullGrad.addColorStop(0, '#fff7cc');
   hullGrad.addColorStop(0.5, '#ffcc00');
   hullGrad.addColorStop(1, '#aa7700');
   ctx.fillStyle = hullGrad;
   ctx.strokeStyle = '#ffffaa';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, -16);
-  ctx.lineTo(11, 0);
-  ctx.lineTo(0, 16);
-  ctx.lineTo(-11, 0);
+  ctx.moveTo(0, -24);
+  ctx.lineTo(16, 0);
+  ctx.lineTo(0, 24);
+  ctx.lineTo(-16, 0);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   // Inner core flicker
   ctx.fillStyle = '#ffffff';
-  ctx.shadowBlur = 10;
-  ctx.beginPath(); ctx.arc(0, 0, 4 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.arc(0, 0, 6 * pulse, 0, Math.PI * 2); ctx.fill();
 
   ctx.restore();
 }
@@ -904,16 +905,20 @@ function update() {
   // life if you manage to hit it while it's briefly visible.
   cloakerSpawnTimer--;
   if (cloakerSpawnTimer <= 0 && !enemies.some(e => e.type === 'cloaker')) {
+    const cx = 60 + Math.random() * (canvas.width - 120);
+    const cy = 100 + Math.random() * (canvas.height - 300);
     enemies.push({
       type: 'cloaker',
-      x: 60 + Math.random() * (canvas.width - 120),
-      y: 100 + Math.random() * (canvas.height - 300),
+      x: cx,
+      y: cy,
       width: 30, height: 30,
       hp: 1,
       phase: 'visible',
-      phaseTimer: 100 + Math.random() * 40,
+      phaseTimer: 130 + Math.random() * 50,
       alpha: 1
     });
+    spawnParticles(cx, cy, '#ffdd00', 14);
+    sfxCloakerAppear();
     cloakerSpawnTimer = 600 + Math.random() * 600;
   }
 
@@ -960,7 +965,12 @@ function update() {
         }
       } else if (e.phase === 'appearing') {
         e.alpha = Math.min(1, 1 - e.phaseTimer / 20);
-        if (e.phaseTimer <= 0) { e.phase = 'visible'; e.phaseTimer = 100 + Math.random() * 40; }
+        if (e.phaseTimer <= 0) {
+          e.phase = 'visible';
+          e.phaseTimer = 130 + Math.random() * 50;
+          spawnParticles(e.x, e.y, '#ffdd00', 14);
+          sfxCloakerAppear();
+        }
       }
       return;
     }
