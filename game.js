@@ -635,7 +635,7 @@ function initGame() {
 function updateUI() {
   scoreDisplay.textContent = score;
   highDisplay.textContent = Math.max(score, ...getHighScores().map(s => s.score), 0);
-  livesDisplay.textContent = lives;
+  livesDisplay.textContent = Math.max(lives, 0);
 }
 
 function loop() {
@@ -667,10 +667,10 @@ function update() {
   if (keys['ArrowLeft'] && player.x - player.width / 2 > 0) player.x -= player.speed;
   if (keys['ArrowRight'] && player.x + player.width / 2 < canvas.width) player.x += player.speed;
 
-  // Machine gun fire — short cooldown
+  // Machine gun fire — longer cooldown so holding the button isn't just automatic fire
   if (keys[' '] && shootCooldown <= 0) {
-    bullets.push({ x: player.x, y: player.y - 22, width: 4, height: 14, vy: -20 });
-    shootCooldown = 5;
+    bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -20 });
+    shootCooldown = 14;
   }
   if (shootCooldown > 0) shootCooldown--;
   if (torpedoCooldown > 0) torpedoCooldown--;
@@ -692,7 +692,7 @@ function update() {
         x: 80 + Math.random() * (canvas.width - 160),
         y: -50,
         width: 55, height: 22,
-        speed: (0.6 + level * 0.1) * speedMul(),
+        speed: (0.5 + level * 0.08) * speedMul(),
         type: 'mothership',
         hp: motherHp,
         maxHp: motherHp,
@@ -700,6 +700,9 @@ function update() {
         points: 1000,
         cannonTimer: 60
       });
+      // Give extra breathing room before the next ship spawns — fighting a mothership
+      // already demands full attention, a small fighter sneaking in is unfair.
+      enemySpawnTimer = -90;
     } else {
       const type = level >= 3 ? Math.floor(Math.random() * 3) : (level === 2 ? Math.floor(Math.random() * 2) : 0);
       const spawnX = 30 + Math.random() * (canvas.width - 60);
@@ -707,7 +710,7 @@ function update() {
         x: spawnX,
         y: -20,
         width: 26, height: 26,
-        speed: (1.5 + level * 0.4 + Math.random()) * speedMul(),
+        speed: (1.1 + level * 0.3 + Math.random()) * speedMul(),
         type,
         tier,
         hp: 1,
@@ -855,7 +858,7 @@ function update() {
     if (e.y > canvas.height + 60 || hitPlayer) {
       if (hitPlayer) spawnParticles(player.x, player.y, '#0099ff', 18);
       enemies.splice(ei, 1);
-      lives--;
+      lives -= e.type === 'mothership' ? 2 : 1;
       updateUI();
       if (lives <= 0) endGame();
     }
