@@ -614,7 +614,7 @@ function initGame() {
   floatingTexts = [];
   torpedoes = [];
   score = 0;
-  lives = difficulty === 'test' ? 9 : 4;
+  lives = difficulty === 'test' ? 6 : 4;
   shootCooldown = 0;
   torpedoCooldown = 0;
   enemySpawnTimer = 0;
@@ -729,6 +729,7 @@ function update() {
     pendingTier = 2;
     transitionPhase = 1;
     transitionTimer = 110;
+    if (difficulty === 'test') { lives = 6; updateUI(); }
     return;
   }
   if (tier === 2 && score >= TIER_THRESHOLDS[difficulty][3]) {
@@ -736,6 +737,7 @@ function update() {
     pendingTier = 3;
     transitionPhase = 1;
     transitionTimer = 110;
+    if (difficulty === 'test') { lives = 6; updateUI(); }
     return;
   }
 
