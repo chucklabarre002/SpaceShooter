@@ -739,7 +739,7 @@ function addFloatingText(x, y, text, color) {
 
 // Photon torpedo detonation — splash damage equal to 13 machine-gun rounds to every ship caught in the blast
 function explodeTorpedo(t) {
-  const splashRadius = 100;
+  const splashRadius = 120;
   spawnParticles(t.x, t.y, '#66ffff', 32);
   sfxExplosionBig();
   for (let ei = enemies.length - 1; ei >= 0; ei--) {
@@ -816,7 +816,7 @@ function loop() {
 
 function fireTorpedo() {
   if (!gameRunning || transitionPhase || torpedoCooldown > 0) return;
-  torpedoes.push({ x: player.x, y: player.y - 24, vy: -5, pulse: 0, damage: 13 });
+  torpedoes.push({ x: player.x, y: player.y - 24, vy: -5, pulse: 0, damage: 22 });
   torpedoCooldown = 30;
   sfxTorpedoLaunch();
 }
@@ -853,6 +853,11 @@ function triggerCloakerHit(e) {
 }
 
 function update() {
+  // Safety net: if player.x ever gets corrupted to a non-finite value (e.g. by a
+  // transient zero-width layout rect on an in-app browser), recenter it instead of
+  // letting NaN/Infinity poison every draw call from then on.
+  if (!Number.isFinite(player.x)) player.x = canvas.width / 2;
+
   // Shake/invulnerability must always tick down, even during a freeze-frame banner --
   // otherwise a freeze that starts right after a hit holds the shake at full intensity
   // for the entire freeze instead of its short intended duration.
@@ -894,7 +899,7 @@ function update() {
   if (keys[' '] && shootCooldown <= 0) {
     bullets.push({ x: player.x, y: player.y - 22, width: strafing ? 5 : 7, height: strafing ? 24 : 14, vy: -30, tracer: strafing });
     if (strafing) {
-      shootCooldown = 2;
+      shootCooldown = 4;
       spawnParticles(player.x, player.y - 20, '#ffaa33', 2);
     } else {
       shootCooldown = difficulty === 'beginner' ? 5 : 8;
@@ -918,11 +923,15 @@ function update() {
     if (mothershipSpawnCounter % 8 === 0) {
       const baseMotherHp = tier === 3 ? 35 : tier === 2 ? 25 : 20;
       const motherHp = difficulty === 'beginner' ? Math.round(baseMotherHp * 0.6) : baseMotherHp;
+      // Speed is capped so it can't run away to absurd values at very high scores
+      // (level keeps climbing with score forever) -- tier 3 also gets knocked down
+      // to 90% of that cap so it stays readable even at the top end.
+      const motherBaseSpeed = Math.min(0.5 + level * 0.08, 2.2);
       enemies.push({
         x: 80 + Math.random() * (canvas.width - 160),
         y: -50,
         width: 55, height: 22,
-        speed: (0.5 + level * 0.08) * speedMul(),
+        speed: motherBaseSpeed * (tier === 3 ? 0.9 : 1) * speedMul(),
         type: 'mothership',
         hp: motherHp,
         maxHp: motherHp,
@@ -936,11 +945,14 @@ function update() {
     } else {
       const type = level >= 3 ? Math.floor(Math.random() * 3) : (level === 2 ? Math.floor(Math.random() * 2) : 0);
       const spawnX = 30 + Math.random() * (canvas.width - 60);
+      // Same speed cap as the mothership -- prevents runaway top-end speed at very
+      // high scores, with tier 3 knocked down to 90% of that cap.
+      const fighterBaseSpeed = Math.min(1.1 + level * 0.3 + Math.random(), 6);
       enemies.push({
         x: spawnX,
         y: -20,
         width: 26, height: 26,
-        speed: (1.1 + level * 0.3 + Math.random()) * speedMul(),
+        speed: fighterBaseSpeed * (tier === 3 ? 0.9 : 1) * speedMul(),
         type,
         tier,
         hp: 1,
@@ -950,7 +962,7 @@ function update() {
         dodgeTimer: 0,
         baseX: spawnX,
         weaveSeed: Math.random() * Math.PI * 2,
-        fireTimer: 60 + Math.random() * 60
+        fireTimer: tier === 3 ? 50 + Math.random() * 40 : 60 + Math.random() * 60
       });
     }
 
@@ -1046,7 +1058,7 @@ function update() {
       e.fireTimer--;
       if (e.fireTimer <= 0 && e.y > 0) {
         enemyBullets.push({ x: e.x, y: e.y + 14, vy: (4 + level * 0.2) * speedMul() });
-        e.fireTimer = 90 + Math.random() * 60;
+        e.fireTimer = 50 + Math.random() * 40;
       }
     } else if (e.tier === 2 && e.type !== 'mothership') {
       if (!e.dodged) {
@@ -1069,7 +1081,7 @@ function update() {
         const spread = 30;
         enemyBullets.push({ x: e.x - spread, y: e.y + 10, vy: (3.5 + level * 0.15) * speedMul() });
         enemyBullets.push({ x: e.x + spread, y: e.y + 10, vy: (3.5 + level * 0.15) * speedMul() });
-        e.cannonTimer = 100;
+        e.cannonTimer = 75;
       }
     }
     e.y += e.speed;
@@ -1176,6 +1188,23 @@ function update() {
 }
 
 function draw() {
+  // If anything inside drawScene() throws (e.g. a NaN coordinate from some
+  // unforeseen edge case), the bloom layer must still get cleared/updated --
+  // otherwise whatever it last successfully held stays permanently smeared on
+  // screen forever, since drawScene() would silently fail every frame after.
+  try {
+    drawScene();
+  } catch (err) {
+    console.error('drawScene() failed, recovering:', err);
+    ctx.fillStyle = '#000005';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  } finally {
+    glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+    glowCtx.drawImage(canvas, 0, 0);
+  }
+}
+
+function drawScene() {
   // Background — drawn before the shake transform so the starfield stays put;
   // only the foreground (ships, particles, bullets) actually shakes on impact.
   ctx.fillStyle = '#000005';
@@ -1327,12 +1356,9 @@ function draw() {
 
   // Cloaking-ship bonus banner
   if (cloakerBannerTimer > 0) drawCloakerBanner();
-
-  // Bloom pass — copy the frame onto a blurred, screen-blended layer (see #glowCanvas
-  // CSS). Screen-blending a near-black background barely changes it, so only the
-  // bright neon shapes visibly bloom outward.
-  glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
-  glowCtx.drawImage(canvas, 0, 0);
+  // Bloom pass (copying the frame onto the blurred #glowCanvas overlay) now happens
+  // unconditionally in draw()'s finally block, so it can never get stuck on a stale
+  // frame even if something above throws.
 }
 
 function drawMissionBanner() {
@@ -1488,12 +1514,16 @@ window.addEventListener('keyup', e => keys[e.key] = false);
 let touchId = null;
 function touchToPlayerPos(touch) {
   const rect = canvas.getBoundingClientRect();
+  // Defensive: in-app browsers (e.g. Messenger's) can report a transient zero-width
+  // layout rect during toolbar animations. Dividing by zero there can produce NaN,
+  // which would permanently corrupt player.x forever after (nothing resets it).
+  if (!rect.width || !rect.height) return null;
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-  return {
-    x: (touch.clientX - rect.left) * scaleX,
-    y: (touch.clientY - rect.top) * scaleY
-  };
+  const x = (touch.clientX - rect.left) * scaleX;
+  const y = (touch.clientY - rect.top) * scaleY;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
 }
 canvas.addEventListener('touchstart', e => {
   if (!gameRunning) return;
@@ -1504,7 +1534,7 @@ canvas.addEventListener('touchstart', e => {
   const t = e.changedTouches[0];
   touchId = t.identifier;
   const pos = touchToPlayerPos(t);
-  player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
+  if (pos) player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
   e.preventDefault();
 }, { passive: false });
 canvas.addEventListener('touchmove', e => {
@@ -1512,7 +1542,7 @@ canvas.addEventListener('touchmove', e => {
   for (const t of e.changedTouches) {
     if (t.identifier === touchId) {
       const pos = touchToPlayerPos(t);
-      player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
+      if (pos) player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, pos.x));
     }
   }
   e.preventDefault();
@@ -1529,8 +1559,10 @@ canvas.addEventListener('touchcancel', () => { touchId = null; });
 canvas.addEventListener('mousemove', e => {
   if (!gameRunning) return;
   const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return;
   const scaleX = canvas.width / rect.width;
   const x = (e.clientX - rect.left) * scaleX;
+  if (!Number.isFinite(x)) return;
   player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, x));
 });
 canvas.addEventListener('mousedown', () => { keys[' '] = true; });
