@@ -879,19 +879,26 @@ function update() {
   if (keys['ArrowLeft'] && player.x - player.width / 2 > 0) player.x -= player.speed;
   if (keys['ArrowRight'] && player.x + player.width / 2 < canvas.width) player.x += player.speed;
 
-  // Strafing mode: firing while actively moving fires hot anti-air-style tracer
-  // rounds instead of plain shots. Each round still only travels straight up
-  // (no sideways drift) — it's the player continuing to move past where each
-  // round was fired that paints a trailing line of fire behind the ship's
-  // motion (trailing right when moving left, and vice versa), rather than a
-  // fan firing out in every direction at once.
+  // Strafing mode: firing while actively moving switches to a rapid-fire burst of
+  // hot tracer rounds, like a ground-based anti-aircraft gun. Each round still only
+  // travels straight up (no sideways drift) -- but because the burst rate is much
+  // faster than normal fire, and the player keeps moving between rounds, the rapid
+  // burst paints a dense, connected line of tracers trailing behind the ship's
+  // motion (trailing right when moving left, and vice versa) instead of a few
+  // widely-spaced single shots.
   const strafing = Math.abs(player.x - lastPlayerX) > 0.5;
   lastPlayerX = player.x;
 
-  // Machine gun fire — longer cooldown so holding the button isn't just automatic fire
+  // Machine gun fire — longer cooldown so holding the button isn't just automatic fire;
+  // strafing drops to a much shorter cooldown for a dense AA-gun burst.
   if (keys[' '] && shootCooldown <= 0) {
-    bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30, tracer: strafing });
-    shootCooldown = difficulty === 'beginner' ? 5 : 8;
+    bullets.push({ x: player.x, y: player.y - 22, width: strafing ? 5 : 7, height: strafing ? 24 : 14, vy: -30, tracer: strafing });
+    if (strafing) {
+      shootCooldown = 2;
+      spawnParticles(player.x, player.y - 20, '#ffaa33', 2);
+    } else {
+      shootCooldown = difficulty === 'beginner' ? 5 : 8;
+    }
     sfxLaser();
   }
   if (shootCooldown > 0) shootCooldown--;
