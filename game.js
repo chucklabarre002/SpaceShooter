@@ -35,6 +35,12 @@ let cloakerBannerTimer = 0;
 
 function speedMul() { return difficulty === 'beginner' ? 0.6 : 1; }
 
+// The cloaker must never become visible at or below this line — player bullets and
+// torpedoes only ever travel upward, so anything at/below the player's bullet spawn
+// point (player.y - 22) is physically unshootable. Leaves a healthy margin so it
+// stays comfortably reachable even after drifting for its whole visible duration.
+function cloakerMaxY() { return canvas.height - 250; }
+
 const TIER_THRESHOLDS = {
   beginner: { 2: 2000, 3: 16000 },
   expert: { 2: 2000, 3: 16000 },
@@ -938,7 +944,7 @@ function update() {
   cloakerSpawnTimer--;
   if (cloakerSpawnTimer <= 0 && !enemies.some(e => e.type === 'cloaker')) {
     const cx = 60 + Math.random() * (canvas.width - 120);
-    const cy = 100 + Math.random() * (canvas.height - 300);
+    const cy = 100 + Math.random() * (cloakerMaxY() - 100);
     enemies.push({
       type: 'cloaker',
       x: cx,
@@ -998,9 +1004,10 @@ function update() {
       } else if (e.phase === 'hidden') {
         e.alpha = 0;
         if (e.phaseTimer <= 0) {
-          // Teleport forward along its journey rather than jumping anywhere on screen
+          // Teleport forward along its journey, but never below the line where
+          // player bullets/torpedoes (which only travel upward) could still reach it.
           e.x = 40 + Math.random() * (canvas.width - 80);
-          e.y = Math.min(canvas.height - 80, e.y + 80 + Math.random() * 120);
+          e.y = Math.min(cloakerMaxY(), e.y + 80 + Math.random() * 120);
           e.phase = 'appearing';
           e.phaseTimer = 20;
         }
