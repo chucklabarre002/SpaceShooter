@@ -1480,6 +1480,20 @@ canvas.addEventListener('touchend', e => {
 }, { passive: false });
 canvas.addEventListener('touchcancel', () => { touchId = null; });
 
+// Mouse: move the cursor over the canvas to steer, click (and hold) to fire,
+// double-click to launch a photon torpedo.
+canvas.addEventListener('mousemove', e => {
+  if (!gameRunning) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const x = (e.clientX - rect.left) * scaleX;
+  player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, x));
+});
+canvas.addEventListener('mousedown', () => { keys[' '] = true; });
+canvas.addEventListener('mouseup', () => { keys[' '] = false; });
+canvas.addEventListener('mouseleave', () => { keys[' '] = false; });
+canvas.addEventListener('dblclick', e => { e.preventDefault(); fireTorpedo(); });
+
 // Touch: press and hold FIRE button to shoot; rapid double-tap launches a photon torpedo
 const fireBtn = document.getElementById('fireBtn');
 fireBtn.addEventListener('touchstart', e => {
