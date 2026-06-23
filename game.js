@@ -13,6 +13,7 @@ const highscoreList = document.getElementById('highscoreList');
 
 let player, bullets, enemies, enemyBullets, particles, floatingTexts, torpedoes, score, lives, gameRunning, animId;
 let keys = {};
+let lastPlayerX = 0;
 let shootCooldown = 0;
 let torpedoCooldown = 0;
 let lastFireTap = 0;
@@ -771,6 +772,7 @@ function explodeTorpedo(t) {
 
 function initGame() {
   player = { x: canvas.width / 2, y: canvas.height - 60, speed: 13, width: 28, height: 28 };
+  lastPlayerX = player.x;
   bullets = [];
   enemies = [];
   enemyBullets = [];
@@ -877,9 +879,22 @@ function update() {
   if (keys['ArrowLeft'] && player.x - player.width / 2 > 0) player.x -= player.speed;
   if (keys['ArrowRight'] && player.x + player.width / 2 < canvas.width) player.x += player.speed;
 
+  // Strafing mode: firing while actively moving lays down a 3-round anti-air-style
+  // tracer spread instead of a single shot — covers more sky as you sweep across,
+  // just like a flak gun walking its fire with the target.
+  const strafing = Math.abs(player.x - lastPlayerX) > 0.5;
+  lastPlayerX = player.x;
+
   // Machine gun fire — longer cooldown so holding the button isn't just automatic fire
   if (keys[' '] && shootCooldown <= 0) {
-    bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30 });
+    if (strafing) {
+      bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30, vx: 0, tracer: true });
+      bullets.push({ x: player.x - 10, y: player.y - 16, width: 5, height: 12, vy: -28, vx: -2.4, tracer: true });
+      bullets.push({ x: player.x + 10, y: player.y - 16, width: 5, height: 12, vy: -28, vx: 2.4, tracer: true });
+      spawnParticles(player.x, player.y - 24, '#ffaa33', 4);
+    } else {
+      bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30 });
+    }
     shootCooldown = difficulty === 'beginner' ? 5 : 8;
     sfxLaser();
   }
@@ -887,7 +902,7 @@ function update() {
   if (torpedoCooldown > 0) torpedoCooldown--;
 
   // Move bullets
-  bullets.forEach(b => b.y += b.vy);
+  bullets.forEach(b => { b.y += b.vy; if (b.vx) b.x += b.vx; });
   bullets = bullets.filter(b => b.y > -20);
 
   // Spawn enemies
@@ -1222,15 +1237,25 @@ function draw() {
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
 
-  // Bullets
+  // Bullets — strafing tracers get a hotter orange/red anti-air-gun look with a
+  // faint smoke-trail puff, regular shots stay yellow-white
   bullets.forEach(b => {
     const bg = ctx.createLinearGradient(b.x, b.y - b.height / 2, b.x, b.y + b.height / 2);
-    bg.addColorStop(0, '#ffffff');
-    bg.addColorStop(0.3, '#ffff44');
-    bg.addColorStop(1, '#ff8800');
-    ctx.fillStyle = bg;
-    ctx.shadowColor = '#ffff00';
-    ctx.shadowBlur = 6;
+    if (b.tracer) {
+      bg.addColorStop(0, '#ffffff');
+      bg.addColorStop(0.3, '#ffaa33');
+      bg.addColorStop(1, '#ff3300');
+      ctx.fillStyle = bg;
+      ctx.shadowColor = '#ff6600';
+      ctx.shadowBlur = 8;
+    } else {
+      bg.addColorStop(0, '#ffffff');
+      bg.addColorStop(0.3, '#ffff44');
+      bg.addColorStop(1, '#ff8800');
+      ctx.fillStyle = bg;
+      ctx.shadowColor = '#ffff00';
+      ctx.shadowBlur = 6;
+    }
     ctx.fillRect(b.x - b.width / 2, b.y - b.height / 2, b.width, b.height);
   });
   ctx.shadowBlur = 0;
