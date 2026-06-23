@@ -873,7 +873,7 @@ function update() {
 
   // Machine gun fire — longer cooldown so holding the button isn't just automatic fire
   if (keys[' '] && shootCooldown <= 0) {
-    bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -20 });
+    bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30 });
     shootCooldown = 14;
     sfxLaser();
   }
