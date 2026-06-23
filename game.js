@@ -772,7 +772,7 @@ function initGame() {
   floatingTexts = [];
   torpedoes = [];
   score = 0;
-  lives = difficulty === 'test' ? 6 : 4;
+  lives = difficulty === 'test' ? 6 : difficulty === 'beginner' ? 6 : 4;
   shootCooldown = 0;
   torpedoCooldown = 0;
   enemySpawnTimer = 0;
@@ -874,7 +874,7 @@ function update() {
   // Machine gun fire — longer cooldown so holding the button isn't just automatic fire
   if (keys[' '] && shootCooldown <= 0) {
     bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30 });
-    shootCooldown = 14;
+    shootCooldown = difficulty === 'beginner' ? 9 : 14;
     sfxLaser();
   }
   if (shootCooldown > 0) shootCooldown--;
@@ -892,7 +892,8 @@ function update() {
 
     // Spawn mothership every 8 enemies
     if (mothershipSpawnCounter % 8 === 0) {
-      const motherHp = tier === 3 ? 35 : tier === 2 ? 25 : 20;
+      const baseMotherHp = tier === 3 ? 35 : tier === 2 ? 25 : 20;
+      const motherHp = difficulty === 'beginner' ? Math.round(baseMotherHp * 0.6) : baseMotherHp;
       enemies.push({
         x: 80 + Math.random() * (canvas.width - 160),
         y: -50,
@@ -955,7 +956,7 @@ function update() {
   }
 
   // Level / tier
-  level = Math.floor(score / (difficulty === 'test' ? 2000 : 200)) + 1;
+  level = Math.floor(score / (difficulty === 'test' ? 2000 : difficulty === 'beginner' ? 350 : 200)) + 1;
   if (tier === 1 && score >= TIER_THRESHOLDS[difficulty][2]) {
     tier = 2;
     pendingTier = 2;
