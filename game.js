@@ -879,22 +879,18 @@ function update() {
   if (keys['ArrowLeft'] && player.x - player.width / 2 > 0) player.x -= player.speed;
   if (keys['ArrowRight'] && player.x + player.width / 2 < canvas.width) player.x += player.speed;
 
-  // Strafing mode: firing while actively moving lays down a 3-round anti-air-style
-  // tracer spread instead of a single shot — covers more sky as you sweep across,
-  // just like a flak gun walking its fire with the target.
+  // Strafing mode: firing while actively moving fires hot anti-air-style tracer
+  // rounds instead of plain shots. Each round still only travels straight up
+  // (no sideways drift) — it's the player continuing to move past where each
+  // round was fired that paints a trailing line of fire behind the ship's
+  // motion (trailing right when moving left, and vice versa), rather than a
+  // fan firing out in every direction at once.
   const strafing = Math.abs(player.x - lastPlayerX) > 0.5;
   lastPlayerX = player.x;
 
   // Machine gun fire — longer cooldown so holding the button isn't just automatic fire
   if (keys[' '] && shootCooldown <= 0) {
-    if (strafing) {
-      bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30, vx: 0, tracer: true });
-      bullets.push({ x: player.x - 10, y: player.y - 16, width: 5, height: 12, vy: -28, vx: -2.4, tracer: true });
-      bullets.push({ x: player.x + 10, y: player.y - 16, width: 5, height: 12, vy: -28, vx: 2.4, tracer: true });
-      spawnParticles(player.x, player.y - 24, '#ffaa33', 4);
-    } else {
-      bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30 });
-    }
+    bullets.push({ x: player.x, y: player.y - 22, width: 7, height: 14, vy: -30, tracer: strafing });
     shootCooldown = difficulty === 'beginner' ? 5 : 8;
     sfxLaser();
   }
@@ -1452,6 +1448,15 @@ function endGame() {
   gameRunning = false;
   cancelAnimationFrame(animId);
   sfxGameOver();
+
+  // The loop stops calling draw() once gameRunning is false, so whatever was on
+  // screen at the exact moment of death (often a big explosion/shake) would
+  // otherwise stay frozen behind the overlay forever. Clear both layers so the
+  // overlay always appears over a clean background.
+  ctx.fillStyle = '#000005';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+
   const name = nameInput.value.trim() || 'PILOT';
   saveHighScore(name, score);
   renderHighScores();
