@@ -646,23 +646,41 @@ function drawMothership(x, y, hp, maxHp, tier) {
   ctx.ellipse(0, -8, 22, 18, 0, 0, Math.PI * 2);
   ctx.fill(); ctx.stroke();
 
-  // Spikes around the rim (tier 2 — more menacing silhouette)
-  if (tier === 2) {
-    ctx.fillStyle = '#aa1133';
-    for (let i = 0; i < 10; i++) {
-      const angle = (i / 10) * Math.PI * 2;
-      const bx = Math.cos(angle) * 50;
-      const by = Math.sin(angle) * 19;
-      const tx = Math.cos(angle) * 64;
-      const ty = Math.sin(angle) * 25;
-      ctx.beginPath();
-      ctx.moveTo(bx - 3, by);
-      ctx.lineTo(tx, ty);
-      ctx.lineTo(bx + 3, by);
-      ctx.closePath();
-      ctx.fill();
-    }
+  // Spikes around the rim — every tier gets a jagged, hostile silhouette now,
+  // not just tier 2.
+  ctx.fillStyle = tier === 3 ? '#335566' : tier === 2 ? '#aa1133' : '#225533';
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2;
+    const bx = Math.cos(angle) * 50;
+    const by = Math.sin(angle) * 19;
+    const tx = Math.cos(angle) * 64;
+    const ty = Math.sin(angle) * 25;
+    ctx.beginPath();
+    ctx.moveTo(bx - 3, by);
+    ctx.lineTo(tx, ty);
+    ctx.lineTo(bx + 3, by);
+    ctx.closePath();
+    ctx.fill();
   }
+
+  // Jagged "teeth" hanging beneath the hull — reads as a predator's underbite
+  ctx.fillStyle = '#0a0a0a';
+  for (let i = -3; i <= 3; i++) {
+    const tx = i * 9;
+    ctx.beginPath();
+    ctx.moveTo(tx - 4, 14);
+    ctx.lineTo(tx, 24);
+    ctx.lineTo(tx + 4, 14);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Pulsing red sensor "eye" in the dome — the single most sinister-reading detail
+  const eyePulse = 0.6 + 0.4 * Math.abs(Math.sin(frameCount * 0.1));
+  ctx.fillStyle = '#ff1111';
+  ctx.shadowColor = '#ff0000';
+  ctx.shadowBlur = 14 * eyePulse;
+  ctx.beginPath(); ctx.arc(0, -10, 4 * eyePulse, 0, Math.PI * 2); ctx.fill();
 
   // Twin side cannons (tier 3 — Dreadnought) with a charging muzzle glow
   if (tier === 3) {
@@ -883,6 +901,13 @@ function loop() {
   animId = requestAnimationFrame(loop);
   frameCount++;
   update();
+  // update() can end the game partway through (e.g. a fatal hit -> endGame(),
+  // which clears the canvas to a clean background behind the overlay). Without
+  // this check, draw() would unconditionally redraw the full scene right on top
+  // of that clear, permanently freezing mid-action graphics behind the overlay
+  // forever -- this was the real, long-standing root cause of the "broken UI"
+  // reports, not the bloom layer or any NaN edge case.
+  if (!gameRunning) return;
   draw();
 }
 
