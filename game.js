@@ -595,6 +595,9 @@ function drawDroneShip(x, y, type, tier, angle) {
 }
 
 // Draw mothership
+// Draw the mothership as a Star Wars-style dreadnought: a wedge-shaped hull
+// tapering to a nose at the front (direction of travel, toward the player),
+// with a raised command bridge and engine glow trailing behind.
 function drawMothership(x, y, hp, maxHp, tier) {
   ctx.save();
   ctx.translate(x, y);
@@ -602,129 +605,110 @@ function drawMothership(x, y, hp, maxHp, tier) {
   const glowColor = tier === 3 ? '#66ddff' : tier === 2 ? '#ff2244' : '#00ff88';
   const pulse = 0.8 + 0.2 * Math.sin(frameCount * 0.05);
   ctx.shadowColor = glowColor;
-  ctx.shadowBlur = 20 * pulse;
+  ctx.shadowBlur = 16 * pulse;
 
-  // Main saucer body
-  const bg = ctx.createRadialGradient(0, 0, 5, 0, 5, 55);
-  if (tier === 3) {
-    bg.addColorStop(0, '#3a4a55');
-    bg.addColorStop(0.5, '#1c2a33');
-    bg.addColorStop(1, '#06090c');
-  } else if (tier === 2) {
-    bg.addColorStop(0, '#552233');
-    bg.addColorStop(0.5, '#330e1a');
-    bg.addColorStop(1, '#150508');
-  } else {
-    bg.addColorStop(0, '#335544');
-    bg.addColorStop(0.5, '#1a3322');
-    bg.addColorStop(1, '#0a1a10');
-  }
-  ctx.fillStyle = bg;
+  // Engine glow — three thrusters along the trailing (back) edge
+  const flicker = Math.random() * 4;
+  [-26, 0, 26].forEach(ex => {
+    const eg = ctx.createLinearGradient(ex, -26, ex, -42 - flicker);
+    eg.addColorStop(0, glowColor);
+    eg.addColorStop(1, 'transparent');
+    ctx.fillStyle = eg;
+    ctx.beginPath();
+    ctx.moveTo(ex - 4, -26); ctx.lineTo(ex, -42 - flicker); ctx.lineTo(ex + 4, -26);
+    ctx.closePath(); ctx.fill();
+  });
+
+  // Main wedge hull — gunmetal gray on every tier, like the source material;
+  // tier is read through the glow/engine/window color instead of hull tint.
+  const hullGrad = ctx.createLinearGradient(-46, 0, 46, 0);
+  hullGrad.addColorStop(0, '#2a2e35');
+  hullGrad.addColorStop(0.5, '#7a828e');
+  hullGrad.addColorStop(1, '#2a2e35');
+  ctx.fillStyle = hullGrad;
   ctx.strokeStyle = glowColor;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 55, 22, 0, 0, Math.PI * 2);
+  ctx.moveTo(0, 38);
+  ctx.lineTo(44, -6);
+  ctx.lineTo(36, -26);
+  ctx.lineTo(-36, -26);
+  ctx.lineTo(-44, -6);
+  ctx.closePath();
   ctx.fill(); ctx.stroke();
 
-  // Top dome
-  const dg = ctx.createRadialGradient(-10, -18, 2, 0, -14, 22);
-  if (tier === 3) {
-    dg.addColorStop(0, '#eaffff');
-    dg.addColorStop(0.4, '#3399cc');
-    dg.addColorStop(1, '#0a2233');
-  } else if (tier === 2) {
-    dg.addColorStop(0, '#ff99aa');
-    dg.addColorStop(0.4, '#cc1133');
-    dg.addColorStop(1, '#330011');
-  } else {
-    dg.addColorStop(0, '#88ffcc');
-    dg.addColorStop(0.4, '#00aa55');
-    dg.addColorStop(1, '#003322');
-  }
-  ctx.fillStyle = dg;
+  // Greeble panel lines — break up the hull surface like paneling
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1;
+  ctx.shadowBlur = 0;
+  [-18, -9, 9, 18].forEach(lx => {
+    ctx.beginPath(); ctx.moveTo(lx * 0.78, -24); ctx.lineTo(lx * 0.15, 30); ctx.stroke();
+  });
+  ctx.beginPath(); ctx.moveTo(-30, -15); ctx.lineTo(30, -15); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-18, 4); ctx.lineTo(18, 4); ctx.stroke();
+  ctx.shadowBlur = 16 * pulse;
+
+  // Command bridge tower, raised near the back of the hull
+  const bridgeGrad = ctx.createLinearGradient(0, -38, 0, -22);
+  bridgeGrad.addColorStop(0, '#5a6270');
+  bridgeGrad.addColorStop(1, '#2a2e35');
+  ctx.fillStyle = bridgeGrad;
+  ctx.strokeStyle = glowColor;
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.ellipse(0, -8, 22, 18, 0, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
+  ctx.moveTo(-13, -22); ctx.lineTo(13, -22); ctx.lineTo(9, -36); ctx.lineTo(-9, -36);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
 
-  // Spikes around the rim — every tier gets a jagged, hostile silhouette now,
-  // not just tier 2.
-  ctx.fillStyle = tier === 3 ? '#335566' : tier === 2 ? '#aa1133' : '#225533';
-  for (let i = 0; i < 10; i++) {
-    const angle = (i / 10) * Math.PI * 2;
-    const bx = Math.cos(angle) * 50;
-    const by = Math.sin(angle) * 19;
-    const tx = Math.cos(angle) * 64;
-    const ty = Math.sin(angle) * 25;
-    ctx.beginPath();
-    ctx.moveTo(bx - 3, by);
-    ctx.lineTo(tx, ty);
-    ctx.lineTo(bx + 3, by);
-    ctx.closePath();
-    ctx.fill();
-  }
+  // Lit bridge viewports
+  const winPulse = 0.6 + 0.4 * Math.abs(Math.sin(frameCount * 0.1));
+  ctx.fillStyle = `rgba(150,220,255,${winPulse})`;
+  ctx.shadowColor = '#aee6ff';
+  ctx.shadowBlur = 6;
+  [-7, -2.5, 2.5, 7].forEach(wx => ctx.fillRect(wx - 1, -33, 2, 4));
 
-  // Jagged "teeth" hanging beneath the hull — reads as a predator's underbite
-  ctx.fillStyle = '#0a0a0a';
-  for (let i = -3; i <= 3; i++) {
-    const tx = i * 9;
-    ctx.beginPath();
-    ctx.moveTo(tx - 4, 14);
-    ctx.lineTo(tx, 24);
-    ctx.lineTo(tx + 4, 14);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Pulsing red sensor "eye" in the dome — the single most sinister-reading detail
+  // Forward targeting sensor — pulsing red, mounted at the nose
   const eyePulse = 0.6 + 0.4 * Math.abs(Math.sin(frameCount * 0.1));
   ctx.fillStyle = '#ff1111';
   ctx.shadowColor = '#ff0000';
-  ctx.shadowBlur = 14 * eyePulse;
-  ctx.beginPath(); ctx.arc(0, -10, 4 * eyePulse, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 10 * eyePulse;
+  ctx.beginPath(); ctx.arc(0, 20, 3 * eyePulse, 0, Math.PI * 2); ctx.fill();
 
-  // Twin side cannons (tier 3 — Dreadnought) with a charging muzzle glow
+  // Twin flank cannons (tier 3 — Dreadnought) with a charging muzzle glow
   if (tier === 3) {
     const cannonPulse = 0.6 + 0.4 * Math.abs(Math.sin(frameCount * 0.08));
-    [-30, 30].forEach(cx => {
+    [-32, 32].forEach(cx => {
       ctx.fillStyle = '#7799aa';
-      ctx.fillRect(cx - 5, 8, 10, 16);
+      ctx.fillRect(cx - 4, -4, 8, 14);
       ctx.fillStyle = `rgba(150,230,255,${cannonPulse})`;
       ctx.shadowColor = '#66ddff';
       ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.arc(cx, 24, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, 11, 4, 0, Math.PI * 2); ctx.fill();
     });
-    // Electric arcs across the hull
-    ctx.strokeStyle = `rgba(150,230,255,${cannonPulse})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-20, 2); ctx.lineTo(-6, -6); ctx.lineTo(6, 4); ctx.lineTo(20, -4);
-    ctx.stroke();
   }
 
-  // Rotating lights around rim
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2 + frameCount * 0.04;
-    const lx = Math.cos(angle) * 44;
-    const ly = Math.sin(angle) * 14;
-    const lit1 = tier === 3 ? '#aaffff' : '#ffff00';
-    const lit2 = tier === 3 ? '#3399ff' : tier === 2 ? '#ff0044' : '#ff4400';
-    ctx.fillStyle = i % 2 === 0 ? lit1 : lit2;
+  // Navigation lights along the hull edges
+  const navPositions = [
+    [44, -6], [36, -26], [-36, -26], [-44, -6], [22, 6], [-22, 6]
+  ];
+  navPositions.forEach(([lx, ly], i) => {
+    const blink = Math.sin(frameCount * 0.06 + i * 1.3) > 0.4;
+    ctx.fillStyle = blink ? (i % 2 === 0 ? '#ffff00' : '#ff2222') : '#553300';
     ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fill();
-  }
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(lx, ly, 2.2, 0, Math.PI * 2); ctx.fill();
+  });
 
   // HP bar
   const barW = 100;
   const hpFrac = hp / maxHp;
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#111';
-  ctx.fillRect(-barW / 2, 28, barW, 7);
+  ctx.fillRect(-barW / 2, 46, barW, 7);
   ctx.fillStyle = hpFrac > 0.5 ? '#00ff44' : hpFrac > 0.25 ? '#ffaa00' : '#ff2200';
-  ctx.fillRect(-barW / 2, 28, barW * hpFrac, 7);
+  ctx.fillRect(-barW / 2, 46, barW * hpFrac, 7);
   ctx.strokeStyle = glowColor;
   ctx.lineWidth = 1;
-  ctx.strokeRect(-barW / 2, 28, barW, 7);
+  ctx.strokeRect(-barW / 2, 46, barW, 7);
 
   ctx.restore();
 }
