@@ -11,7 +11,7 @@ const startBtn = document.getElementById('startBtn');
 const nameInput = document.getElementById('nameInput');
 const highscoreList = document.getElementById('highscoreList');
 
-let player, bullets, enemies, enemyBullets, particles, floatingTexts, torpedoes, score, lives, gameRunning, animId;
+let player, bullets, enemies, enemyBullets, enemyMissiles, particles, floatingTexts, torpedoes, score, lives, gameRunning, animId;
 let keys = {};
 let lastPlayerX = 0;
 let shootCooldown = 0;
@@ -131,6 +131,7 @@ function sfxBonusLife() {
   });
 }
 function sfxCloakerAppear() { playTone({ freq: 1200, freqEnd: 2000, duration: 0.2, type: 'sine', volume: 0.12 }); }
+function sfxMissileLaunch() { playTone({ freq: 300, freqEnd: 150, duration: 0.15, type: 'sawtooth', volume: 0.09 }); }
 
 // Generate stable star field once
 const STARS = Array.from({ length: 160 }, (_, i) => ({
@@ -768,6 +769,15 @@ function explodeTorpedo(t) {
       spawnParticles(e.x, e.y, '#ffff00', 10);
     }
   }
+  for (let mi = enemyMissiles.length - 1; mi >= 0; mi--) {
+    const m = enemyMissiles[mi];
+    if (Math.hypot(m.x - t.x, m.y - t.y) > splashRadius) continue;
+    spawnParticles(m.x, m.y, '#ff6622', 14);
+    addFloatingText(m.x, m.y, '+15', '#ff6622');
+    score += 15;
+    enemyMissiles.splice(mi, 1);
+    updateUI();
+  }
 }
 
 function initGame() {
@@ -776,6 +786,7 @@ function initGame() {
   bullets = [];
   enemies = [];
   enemyBullets = [];
+  enemyMissiles = [];
   particles = [];
   floatingTexts = [];
   torpedoes = [];
@@ -947,26 +958,58 @@ function update() {
       enemySpawnTimer = -90;
     } else {
       const type = level >= 3 ? Math.floor(Math.random() * 3) : (level === 2 ? Math.floor(Math.random() * 2) : 0);
-      const spawnX = 30 + Math.random() * (canvas.width - 60);
       // Same speed cap as the mothership -- prevents runaway top-end speed at very
       // high scores, with tier 3 knocked down to 90% of that cap.
       const fighterBaseSpeed = Math.min(1.1 + level * 0.3 + Math.random(), 6);
-      enemies.push({
-        x: spawnX,
-        y: -20,
-        width: 26, height: 26,
-        speed: fighterBaseSpeed * (tier === 3 ? 0.9 : 1) * speedMul(),
-        type,
-        tier,
-        hp: 1,
-        points: (type + 1) * 20,
-        vx: 0,
-        dodged: false,
-        dodgeTimer: 0,
-        baseX: spawnX,
-        weaveSeed: Math.random() * Math.PI * 2,
-        fireTimer: tier === 3 ? 50 + Math.random() * 40 : 60 + Math.random() * 60
-      });
+      const finalSpeed = fighterBaseSpeed * (tier === 3 ? 0.9 : 1) * speedMul();
+
+      // Side-entry ships fly in from the left/right edge before turning to descend
+      // normally -- rare at tier 1, more common at tier 2 and 3, for visual variety.
+      const sideEntryChance = tier === 3 ? 0.30 : tier === 2 ? 0.18 : 0.08;
+      const isSideEntry = Math.random() < sideEntryChance;
+
+      if (isSideEntry) {
+        const fromLeft = Math.random() < 0.5;
+        enemies.push({
+          x: fromLeft ? -30 : canvas.width + 30,
+          y: 60 + Math.random() * 200,
+          width: 26, height: 26,
+          speed: finalSpeed,
+          type,
+          tier,
+          hp: 1,
+          points: (type + 1) * 20,
+          vx: 0,
+          dodged: false,
+          dodgeTimer: 0,
+          baseX: 0,
+          weaveSeed: Math.random() * Math.PI * 2,
+          fireTimer: tier === 3 ? 50 + Math.random() * 40 : 60 + Math.random() * 60,
+          sideEntry: true,
+          turned: false,
+          entryVx: (fromLeft ? 1 : -1) * (2.5 + level * 0.15) * speedMul(),
+          entryTimer: 45 + Math.random() * 35,
+          missileTimer: 90 + Math.random() * 70
+        });
+      } else {
+        const spawnX = 30 + Math.random() * (canvas.width - 60);
+        enemies.push({
+          x: spawnX,
+          y: -20,
+          width: 26, height: 26,
+          speed: finalSpeed,
+          type,
+          tier,
+          hp: 1,
+          points: (type + 1) * 20,
+          vx: 0,
+          dodged: false,
+          dodgeTimer: 0,
+          baseX: spawnX,
+          weaveSeed: Math.random() * Math.PI * 2,
+          fireTimer: tier === 3 ? 50 + Math.random() * 40 : 60 + Math.random() * 60
+        });
+      }
     }
 
     if (enemySpawnInterval > 40) enemySpawnInterval -= 0.3;
@@ -1055,6 +1098,26 @@ function update() {
       }
       return;
     }
+    if (e.sideEntry && !e.turned) {
+      // Flying in from the edge — pure horizontal travel, no descent yet.
+      e.x += e.entryVx;
+      e.entryTimer--;
+      if (e.entryTimer <= 0) {
+        e.turned = true;
+        e.baseX = e.x;
+      }
+      return;
+    }
+    if (e.sideEntry && e.turned && e.type !== 'mothership') {
+      // Now descending normally — periodically lob a slow missile the player can
+      // shoot down, on top of whatever this tier's standard fire pattern is.
+      e.missileTimer--;
+      if (e.missileTimer <= 0 && e.y > 0) {
+        enemyMissiles.push({ x: e.x, y: e.y + 14, vy: (1.6 + level * 0.05) * speedMul() });
+        sfxMissileLaunch();
+        e.missileTimer = 140 + Math.random() * 100;
+      }
+    }
     if (e.tier === 3 && e.type !== 'mothership') {
       e.x = e.baseX + Math.sin(frameCount * 0.05 + e.weaveSeed) * 30;
       e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
@@ -1112,6 +1175,21 @@ function update() {
     }
   }
 
+  // Move enemy missiles and resolve collision with the player (these are slow
+  // enough, and large enough, that the player can also shoot them down first)
+  for (let mi = enemyMissiles.length - 1; mi >= 0; mi--) {
+    const m = enemyMissiles[mi];
+    m.y += m.vy;
+    const hitPlayer = lives > 0 && Math.abs(m.x - player.x) < 18 && Math.abs(m.y - player.y) < 22;
+    if (hitPlayer) {
+      spawnParticles(player.x, player.y, '#ff6622', 18);
+      enemyMissiles.splice(mi, 1);
+      damagePlayer(1);
+    } else if (m.y > canvas.height + 30) {
+      enemyMissiles.splice(mi, 1);
+    }
+  }
+
   // Move & resolve photon torpedoes — slow, pulsing, AoE splash damage
   for (let ti = torpedoes.length - 1; ti >= 0; ti--) {
     const t = torpedoes[ti];
@@ -1166,6 +1244,24 @@ function update() {
           spawnParticles(b.x, b.y, '#ffff00', 4);
           sfxMothershipHit();
         }
+        break;
+      }
+    }
+  }
+
+  // Collision: bullets vs enemy missiles — shoot them down before they reach you
+  for (let bi = bullets.length - 1; bi >= 0; bi--) {
+    const b = bullets[bi];
+    for (let mi = enemyMissiles.length - 1; mi >= 0; mi--) {
+      const m = enemyMissiles[mi];
+      if (Math.abs(b.x - m.x) < 16 && Math.abs(b.y - m.y) < 18) {
+        bullets.splice(bi, 1);
+        spawnParticles(m.x, m.y, '#ff6622', 14);
+        addFloatingText(m.x, m.y, '+15', '#ff6622');
+        score += 15;
+        enemyMissiles.splice(mi, 1);
+        updateUI();
+        sfxExplosionSmall();
         break;
       }
     }
@@ -1309,6 +1405,39 @@ function drawScene() {
     ctx.shadowColor = '#66ddff';
     ctx.shadowBlur = 8;
     ctx.fillRect(eb.x - 2.5, eb.y - 8, 5, 16);
+  });
+  ctx.shadowBlur = 0;
+
+  // Enemy missiles — slow torpedo-like projectile the player can shoot down
+  enemyMissiles.forEach(m => {
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    const flicker = Math.random() * 3;
+    const trailGrad = ctx.createLinearGradient(0, -8, 0, -16 - flicker);
+    trailGrad.addColorStop(0, '#ffaa33');
+    trailGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = trailGrad;
+    ctx.beginPath(); ctx.moveTo(-3, -8); ctx.lineTo(0, -16 - flicker); ctx.lineTo(3, -8); ctx.closePath(); ctx.fill();
+
+    const bodyGrad = ctx.createLinearGradient(0, -8, 0, 8);
+    bodyGrad.addColorStop(0, '#ffcc88');
+    bodyGrad.addColorStop(0.5, '#ff6622');
+    bodyGrad.addColorStop(1, '#992200');
+    ctx.fillStyle = bodyGrad;
+    ctx.strokeStyle = '#ffaa66';
+    ctx.shadowColor = '#ff6622';
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -9);
+    ctx.lineTo(3.5, -2);
+    ctx.lineTo(3.5, 7);
+    ctx.lineTo(-3.5, 7);
+    ctx.lineTo(-3.5, -2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
   });
   ctx.shadowBlur = 0;
 
