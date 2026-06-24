@@ -1075,7 +1075,7 @@ function update() {
           turned: false,
           entryVx: (fromLeft ? 1 : -1) * (2.5 + level * 0.15) * speedMul(),
           entryTimer: 45 + Math.random() * 35,
-          missileTimer: 90 + Math.random() * 70
+          missileTimer: 60 + Math.random() * 50
         });
       } else {
         const spawnX = 30 + Math.random() * (canvas.width - 60);
@@ -1201,7 +1201,7 @@ function update() {
       if (e.missileTimer <= 0 && e.y > 0) {
         enemyMissiles.push({ x: e.x, y: e.y + 14, vy: (1.6 + level * 0.05) * speedMul(), pulse: 0 });
         sfxMissileLaunch();
-        e.missileTimer = 140 + Math.random() * 100;
+        e.missileTimer = 70 + Math.random() * 50;
       }
     }
     if (e.tier === 3 && e.type !== 'mothership') {
@@ -1209,7 +1209,7 @@ function update() {
       e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
       e.fireTimer--;
       if (e.fireTimer <= 0 && e.y > 0) {
-        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (4 + level * 0.2) * speedMul() });
+        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (5.6 + level * 0.28) * speedMul() });
         e.fireTimer = 50 + Math.random() * 40;
       }
     } else if (e.tier === 2 && e.type !== 'mothership') {
@@ -1228,7 +1228,7 @@ function update() {
       }
       e.fireTimer--;
       if (e.fireTimer <= 0 && e.y > 0) {
-        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (3.2 + level * 0.15) * speedMul() });
+        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (4.6 + level * 0.22) * speedMul() });
         e.fireTimer = 90 + Math.random() * 70;
       }
     } else if (e.tier === 1 && e.type !== 'mothership') {
@@ -1236,7 +1236,7 @@ function update() {
       // than tier 2/3, so the very first level isn't completely passive.
       e.fireTimer--;
       if (e.fireTimer <= 0 && e.y > 0) {
-        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (2.8 + level * 0.1) * speedMul() });
+        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (4 + level * 0.15) * speedMul() });
         e.fireTimer = 160 + Math.random() * 120;
       }
     }
@@ -1248,8 +1248,8 @@ function update() {
       e.cannonTimer--;
       if (e.cannonTimer <= 0 && e.y > 0) {
         const spread = 30;
-        enemyBullets.push({ x: e.x - spread, y: e.y + 10, vy: (3.5 + level * 0.15) * speedMul() });
-        enemyBullets.push({ x: e.x + spread, y: e.y + 10, vy: (3.5 + level * 0.15) * speedMul() });
+        enemyBullets.push({ x: e.x - spread, y: e.y + 10, vy: (5 + level * 0.22) * speedMul() });
+        enemyBullets.push({ x: e.x + spread, y: e.y + 10, vy: (5 + level * 0.22) * speedMul() });
         e.cannonTimer = 75;
       }
     }
