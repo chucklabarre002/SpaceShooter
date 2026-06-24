@@ -1,7 +1,5 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const glowCanvas = document.getElementById('glowCanvas');
-const glowCtx = glowCanvas.getContext('2d');
 
 const scoreDisplay = document.getElementById('scoreDisplay');
 const highDisplay = document.getElementById('highDisplay');
@@ -445,27 +443,32 @@ function drawShip(x, y) {
 }
 
 // Draw enemy fighter
-function drawEnemyShip(x, y, type, tier) {
+const FIGHTER_COLORS_T1 = {
+  0: { body: '#882299', wing: '#550066', glow: '#ff00ff', accent: '#ff88ff' },
+  1: { body: '#993311', wing: '#661100', glow: '#ff4400', accent: '#ff8844' },
+  2: { body: '#887700', wing: '#554400', glow: '#ffaa00', accent: '#ffdd44' },
+};
+const FIGHTER_COLORS_T2 = {
+  0: { body: '#1a4488', wing: '#0a2255', glow: '#22aaff', accent: '#aaeeff' },
+  1: { body: '#225544', wing: '#0e3322', glow: '#22ffaa', accent: '#aaffdd' },
+  2: { body: '#444466', wing: '#222244', glow: '#8888ff', accent: '#ccccff' },
+};
+const FIGHTER_COLORS_T3 = {
+  0: { body: '#334455', wing: '#1a2530', glow: '#66ddff', accent: '#e0ffff' },
+  1: { body: '#4a3355', wing: '#251a2c', glow: '#cc66ff', accent: '#f0e0ff' },
+  2: { body: '#553344', wing: '#2c1a22', glow: '#ff6699', accent: '#ffe0ec' },
+};
+function fighterColors(type, tier) {
+  const map = tier === 3 ? FIGHTER_COLORS_T3 : tier === 2 ? FIGHTER_COLORS_T2 : FIGHTER_COLORS_T1;
+  return map[type] || map[0];
+}
+
+function drawEnemyShip(x, y, type, tier, angle) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(Math.PI);
+  ctx.rotate(angle ?? Math.PI);
 
-  const colors = {
-    0: { body: '#882299', wing: '#550066', glow: '#ff00ff', accent: '#ff88ff' },
-    1: { body: '#993311', wing: '#661100', glow: '#ff4400', accent: '#ff8844' },
-    2: { body: '#887700', wing: '#554400', glow: '#ffaa00', accent: '#ffdd44' },
-  };
-  const tier2Colors = {
-    0: { body: '#1a4488', wing: '#0a2255', glow: '#22aaff', accent: '#aaeeff' },
-    1: { body: '#225544', wing: '#0e3322', glow: '#22ffaa', accent: '#aaffdd' },
-    2: { body: '#444466', wing: '#222244', glow: '#8888ff', accent: '#ccccff' },
-  };
-  const tier3Colors = {
-    0: { body: '#334455', wing: '#1a2530', glow: '#66ddff', accent: '#e0ffff' },
-    1: { body: '#4a3355', wing: '#251a2c', glow: '#cc66ff', accent: '#f0e0ff' },
-    2: { body: '#553344', wing: '#2c1a22', glow: '#ff6699', accent: '#ffe0ec' },
-  };
-  const c = tier === 3 ? (tier3Colors[type] || tier3Colors[0]) : tier === 2 ? (tier2Colors[type] || tier2Colors[0]) : (colors[type] || colors[0]);
+  const c = fighterColors(type, tier);
 
   // Tier 3 stealth drones flicker in and out — a cloaking effect
   if (tier === 3) {
@@ -529,6 +532,64 @@ function drawEnemyShip(x, y, type, tier) {
   ctx.strokeStyle = c.accent;
   ctx.shadowBlur = 8;
   ctx.beginPath(); ctx.ellipse(0, -10, 3, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+// Draw a side-entry "drone" ship — mechanical quad-rotor silhouette instead of a
+// fighter-jet body, so ships that fly in from the edge read as a different kind
+// of threat. angle controls facing: horizontal while flying in from the side,
+// rotated to point down once it turns to descend, same convention as drawEnemyShip.
+function drawDroneShip(x, y, type, tier, angle) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle ?? Math.PI);
+  const c = fighterColors(type, tier);
+
+  // Engine glow trail (rear, opposite the nose/sensor)
+  const flicker = Math.random() * 4;
+  const eg = ctx.createLinearGradient(0, 6, 0, 16 + flicker);
+  eg.addColorStop(0, c.glow);
+  eg.addColorStop(1, 'transparent');
+  ctx.fillStyle = eg;
+  ctx.beginPath(); ctx.moveTo(-4, 6); ctx.lineTo(0, 16 + flicker); ctx.lineTo(4, 6); ctx.closePath(); ctx.fill();
+
+  // Rotor arms (X layout) with blinking tip lights
+  const blink = Math.sin(frameCount * 0.2 + x * 0.05) > 0.3;
+  ctx.strokeStyle = c.wing;
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = c.glow;
+  ctx.shadowBlur = 4;
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy]) => {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dx * 13, dy * 10); ctx.stroke();
+    ctx.fillStyle = blink ? c.accent : c.body;
+    ctx.beginPath(); ctx.ellipse(dx * 13, dy * 10, 4, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // Hexagonal central hub
+  const hubGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, 11);
+  hubGrad.addColorStop(0, c.accent);
+  hubGrad.addColorStop(0.5, c.body);
+  hubGrad.addColorStop(1, c.wing);
+  ctx.fillStyle = hubGrad;
+  ctx.strokeStyle = c.accent;
+  ctx.lineWidth = 1.2;
+  ctx.shadowColor = c.glow;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const px = Math.cos(a) * 9, py = Math.sin(a) * 9;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Pulsing red sensor "eye" facing the nose direction
+  const pulse = 0.6 + 0.4 * Math.abs(Math.sin(frameCount * 0.15));
+  ctx.fillStyle = '#ff2222';
+  ctx.shadowColor = '#ff2222';
+  ctx.shadowBlur = 8 * pulse;
+  ctx.beginPath(); ctx.arc(0, -9, 2.5 * pulse, 0, Math.PI * 2); ctx.fill();
 
   ctx.restore();
 }
@@ -984,7 +1045,7 @@ function update() {
           dodgeTimer: 0,
           baseX: 0,
           weaveSeed: Math.random() * Math.PI * 2,
-          fireTimer: tier === 3 ? 50 + Math.random() * 40 : 60 + Math.random() * 60,
+          fireTimer: tier === 3 ? 50 + Math.random() * 40 : tier === 2 ? 90 + Math.random() * 70 : 160 + Math.random() * 120,
           sideEntry: true,
           turned: false,
           entryVx: (fromLeft ? 1 : -1) * (2.5 + level * 0.15) * speedMul(),
@@ -1007,7 +1068,7 @@ function update() {
           dodgeTimer: 0,
           baseX: spawnX,
           weaveSeed: Math.random() * Math.PI * 2,
-          fireTimer: tier === 3 ? 50 + Math.random() * 40 : 60 + Math.random() * 60
+          fireTimer: tier === 3 ? 50 + Math.random() * 40 : tier === 2 ? 90 + Math.random() * 70 : 160 + Math.random() * 120
         });
       }
     }
@@ -1113,7 +1174,7 @@ function update() {
       // shoot down, on top of whatever this tier's standard fire pattern is.
       e.missileTimer--;
       if (e.missileTimer <= 0 && e.y > 0) {
-        enemyMissiles.push({ x: e.x, y: e.y + 14, vy: (1.6 + level * 0.05) * speedMul() });
+        enemyMissiles.push({ x: e.x, y: e.y + 14, vy: (1.6 + level * 0.05) * speedMul(), pulse: 0 });
         sfxMissileLaunch();
         e.missileTimer = 140 + Math.random() * 100;
       }
@@ -1139,6 +1200,19 @@ function update() {
         e.x += e.vx;
         e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
         e.dodgeTimer--;
+      }
+      e.fireTimer--;
+      if (e.fireTimer <= 0 && e.y > 0) {
+        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (3.2 + level * 0.15) * speedMul() });
+        e.fireTimer = 90 + Math.random() * 70;
+      }
+    } else if (e.tier === 1 && e.type !== 'mothership') {
+      // Even on tier 1, fighters shoot back occasionally -- just much more rarely
+      // than tier 2/3, so the very first level isn't completely passive.
+      e.fireTimer--;
+      if (e.fireTimer <= 0 && e.y > 0) {
+        enemyBullets.push({ x: e.x, y: e.y + 14, vy: (2.8 + level * 0.1) * speedMul() });
+        e.fireTimer = 160 + Math.random() * 120;
       }
     }
     if (e.type === 'mothership' && e.tier === 3) {
@@ -1180,6 +1254,7 @@ function update() {
   for (let mi = enemyMissiles.length - 1; mi >= 0; mi--) {
     const m = enemyMissiles[mi];
     m.y += m.vy;
+    m.pulse += 0.22;
     const hitPlayer = lives > 0 && Math.abs(m.x - player.x) < 18 && Math.abs(m.y - player.y) < 22;
     if (hitPlayer) {
       spawnParticles(player.x, player.y, '#ff6622', 18);
@@ -1291,19 +1366,15 @@ function update() {
 }
 
 function draw() {
-  // If anything inside drawScene() throws (e.g. a NaN coordinate from some
-  // unforeseen edge case), the bloom layer must still get cleared/updated --
-  // otherwise whatever it last successfully held stays permanently smeared on
-  // screen forever, since drawScene() would silently fail every frame after.
+  // Catches any unexpected exception inside drawScene() (e.g. a NaN coordinate
+  // from some unforeseen edge case) so a single bad frame can't cascade into a
+  // permanently broken canvas -- it just redraws cleanly next frame instead.
   try {
     drawScene();
   } catch (err) {
     console.error('drawScene() failed, recovering:', err);
     ctx.fillStyle = '#000005';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-  } finally {
-    glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
-    glowCtx.drawImage(canvas, 0, 0);
   }
 }
 
@@ -1408,36 +1479,21 @@ function drawScene() {
   });
   ctx.shadowBlur = 0;
 
-  // Enemy missiles — slow torpedo-like projectile the player can shoot down
+  // Enemy missiles — pulsing photon-torpedo-style orb (hostile red/orange) that
+  // the player can shoot down to detonate it harmlessly before it connects.
   enemyMissiles.forEach(m => {
-    ctx.save();
-    ctx.translate(m.x, m.y);
-    const flicker = Math.random() * 3;
-    const trailGrad = ctx.createLinearGradient(0, -8, 0, -16 - flicker);
-    trailGrad.addColorStop(0, '#ffaa33');
-    trailGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = trailGrad;
-    ctx.beginPath(); ctx.moveTo(-3, -8); ctx.lineTo(0, -16 - flicker); ctx.lineTo(3, -8); ctx.closePath(); ctx.fill();
-
-    const bodyGrad = ctx.createLinearGradient(0, -8, 0, 8);
-    bodyGrad.addColorStop(0, '#ffcc88');
-    bodyGrad.addColorStop(0.5, '#ff6622');
-    bodyGrad.addColorStop(1, '#992200');
-    ctx.fillStyle = bodyGrad;
-    ctx.strokeStyle = '#ffaa66';
-    ctx.shadowColor = '#ff6622';
-    ctx.shadowBlur = 8;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, -9);
-    ctx.lineTo(3.5, -2);
-    ctx.lineTo(3.5, 7);
-    ctx.lineTo(-3.5, 7);
-    ctx.lineTo(-3.5, -2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    const pulseR = 8 + Math.sin(m.pulse) * 3;
+    const mg = ctx.createRadialGradient(m.x, m.y, 1, m.x, m.y, pulseR * 2);
+    mg.addColorStop(0, '#ffffff');
+    mg.addColorStop(0.3, '#ffaa66');
+    mg.addColorStop(0.6, '#ff3300');
+    mg.addColorStop(1, 'transparent');
+    ctx.fillStyle = mg;
+    ctx.beginPath(); ctx.arc(m.x, m.y, pulseR * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ff4400';
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(m.x, m.y, pulseR * 0.4, 0, Math.PI * 2); ctx.fill();
   });
   ctx.shadowBlur = 0;
 
@@ -1462,6 +1518,12 @@ function drawScene() {
   enemies.forEach(e => {
     if (e.type === 'cloaker') { if (e.alpha > 0.02) drawCloaker(e.x, e.y, e.alpha); }
     else if (e.type === 'mothership') drawMothership(e.x, e.y, e.hp, e.maxHp, e.tier);
+    else if (e.sideEntry) {
+      // Nose points in the direction of travel while flying in from the edge,
+      // then snaps to point straight down once it turns to descend normally.
+      const angle = e.turned ? Math.PI : (e.entryVx > 0 ? Math.PI / 2 : -Math.PI / 2);
+      drawDroneShip(e.x, e.y, e.type, e.tier, angle);
+    }
     else drawEnemyShip(e.x, e.y, e.type, e.tier);
   });
 
@@ -1492,9 +1554,6 @@ function drawScene() {
 
   // Cloaking-ship bonus banner
   if (cloakerBannerTimer > 0) drawCloakerBanner();
-  // Bloom pass (copying the frame onto the blurred #glowCanvas overlay) now happens
-  // unconditionally in draw()'s finally block, so it can never get stuck on a stale
-  // frame even if something above throws.
 }
 
 function drawMissionBanner() {
@@ -1620,11 +1679,10 @@ function endGame() {
 
   // The loop stops calling draw() once gameRunning is false, so whatever was on
   // screen at the exact moment of death (often a big explosion/shake) would
-  // otherwise stay frozen behind the overlay forever. Clear both layers so the
-  // overlay always appears over a clean background.
+  // otherwise stay frozen behind the overlay forever. Clear it so the overlay
+  // always appears over a clean background.
   ctx.fillStyle = '#000005';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
 
   const name = nameInput.value.trim() || 'PILOT';
   saveHighScore(name, score);
