@@ -927,8 +927,9 @@ function update() {
       // (level keeps climbing with score forever) -- tier 3 also gets knocked down
       // to 90% of that cap so it stays readable even at the top end.
       const motherBaseSpeed = Math.min(0.5 + level * 0.08, 2.2);
+      const motherX = 80 + Math.random() * (canvas.width - 160);
       enemies.push({
-        x: 80 + Math.random() * (canvas.width - 160),
+        x: motherX,
         y: -50,
         width: 55, height: 22,
         speed: motherBaseSpeed * (tier === 3 ? 0.9 : 1) * speedMul(),
@@ -937,7 +938,9 @@ function update() {
         maxHp: motherHp,
         tier,
         points: 1000,
-        cannonTimer: 60
+        cannonTimer: 60,
+        baseX: motherX,
+        weaveSeed: Math.random() * Math.PI * 2
       });
       // Give extra breathing room before the next ship spawns — fighting a mothership
       // already demands full attention, a small fighter sneaking in is unfair.
@@ -1076,6 +1079,10 @@ function update() {
       }
     }
     if (e.type === 'mothership' && e.tier === 3) {
+      // Tier 3 motherships are no longer a straight-down target -- they slowly
+      // weave side to side, like the dodging/weaving fighters at this tier.
+      e.x = e.baseX + Math.sin(frameCount * 0.02 + e.weaveSeed) * 60;
+      e.x = Math.max(e.width / 2, Math.min(canvas.width - e.width / 2, e.x));
       e.cannonTimer--;
       if (e.cannonTimer <= 0 && e.y > 0) {
         const spread = 30;
